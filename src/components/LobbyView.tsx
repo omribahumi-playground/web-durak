@@ -9,6 +9,7 @@ import {
 } from '../game/types';
 import { PublicServerInfo } from '../net/publicServer';
 import { SignalingStatus } from '../net/webrtc';
+import { QrCodeDisplay, QrScannerModal } from './QrCodeTools';
 
 interface LobbyViewProps {
   role: 'host' | 'guest';
@@ -82,6 +83,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   const [copied, setCopied] = useState<'code' | 'link' | 'offer' | 'invite' | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [showManual, setShowManual] = useState(false);
+  const [scanAnswerOpen, setScanAnswerOpen] = useState(false);
   const [manualPending, setManualPending] = useState<{ peerId: string; offerCode: string } | null>(null);
   const [manualAnswerInput, setManualAnswerInput] = useState('');
   const [manualMsg, setManualMsg] = useState('');
@@ -115,12 +117,14 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
     }
   };
 
-  const handleApplyAnswer = async () => {
+  const handleApplyAnswer = async (codeOverride?: string) => {
     if (!manualPending) return;
+    const code = (codeOverride ?? manualAnswerInput).trim();
+    if (!code) return;
     setManualMsg('');
     setManualBusy(true);
     try {
-      await onApplyManualAnswer(manualPending.peerId, manualAnswerInput);
+      await onApplyManualAnswer(manualPending.peerId, code);
       setManualPending(null);
       setManualAnswerInput('');
       setManualMsg('WebRTC DataChannel handshake sent! Waiting for peer to appear in a seat.');
@@ -205,10 +209,10 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               {isHost && (
                 <button
                   type="button"
-                  className="btn btn-ghost"
+                  className="btn btn-secondary"
                   onClick={() => setShowManual((v) => !v)}
                 >
-                  {showManual ? 'Hide Direct P2P' : 'Direct P2P Code'}
+                  {showManual ? 'Hide Offline QR / P2P' : '📷 Offline QR / P2P'}
                 </button>
               )}
             </div>
@@ -216,24 +220,28 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
           {isHost && showManual && (
             <section className="panel manual-panel">
-              <h3>Direct Serverless WebRTC Handshake</h3>
+              <h3>Offline / LAN QR Code Pairing (Zero Internet)</h3>
               <p className="muted-small">
-                Connect a friend over WebRTC with zero signaling server by exchanging Offer &amp; Answer codes.
+                Pair two devices on a private Wi-Fi / hotspot with zero internet by scanning Offer &amp; Answer QR codes.
               </p>
               {!manualPending ? (
                 <button
                   type="button"
-                  className="btn btn-secondary btn-sm"
+                  className="btn btn-gold btn-sm"
                   disabled={manualBusy}
                   onClick={() => void handleGenerateOffer()}
                 >
-                  {manualBusy ? 'Gathering ICE...' : '1. Generate Offer Code for Friend'}
+                  {manualBusy ? 'Gathering LAN Candidates...' : '1. Generate Offer QR Code'}
                 </button>
               ) : (
                 <div className="manual-steps">
+                  <QrCodeDisplay
+                    value={manualPending.offerCode}
+                    label="1. Have your friend scan this Offer QR (or copy code):"
+                  />
                   <div>
                     <div className="manual-row-head">
-                      <label>1. Copy &amp; send this Offer Code to your friend:</label>
+                      <label>Offer Code (text fallback)</label>
                       <button
                         type="button"
                         className="btn btn-ghost btn-xs"
@@ -244,13 +252,23 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                     </div>
                     <textarea readOnly rows={2} value={manualPending.offerCode} />
                   </div>
-                  <div>
-                    <label>2. Paste your friend&apos;s Answer Code here:</label>
+                  <div className="manual-answer-block">
+                    <div className="manual-row-head">
+                      <label>2. Scan or paste your friend&apos;s Answer:</label>
+                      <button
+                        type="button"
+                        className="btn btn-gold btn-xs"
+                        disabled={manualBusy}
+                        onClick={() => setScanAnswerOpen(true)}
+                      >
+                        📷 Scan Answer QR
+                      </button>
+                    </div>
                     <textarea
                       rows={2}
                       value={manualAnswerInput}
                       onChange={(e) => setManualAnswerInput(e.target.value)}
-                      placeholder="Paste guest's Answer code..."
+                      placeholder="Or paste guest's Answer code here..."
                     />
                   </div>
                   <div className="manual-actions">
@@ -277,6 +295,19 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               )}
               {manualMsg && <p className="muted-small">{manualMsg}</p>}
             </section>
+          )}
+
+          {scanAnswerOpen && manualPending && (
+            <QrScannerModal
+              title="Scan Guest's Answer QR"
+              hint="Point your camera at your friend's Answer QR code to complete the LAN WebRTC link."
+              onClose={() => setScanAnswerOpen(false)}
+              onScan={(decoded) => {
+                setScanAnswerOpen(false);
+                setManualAnswerInput(decoded);
+                void handleApplyAnswer(decoded);
+              }}
+            />
           )}
 
           {isHost && (

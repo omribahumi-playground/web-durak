@@ -2581,3 +2581,105 @@ textarea:focus {
     max-width: none;
   }
 }
+
+/* ---------- QR Code Display & Camera Scanner ---------- */
+.qr-display-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(5, 14, 11, 0.55);
+  border: 1px solid rgba(224, 185, 99, 0.28);
+}
+
+.qr-display-label {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--gold-strong);
+  text-align: center;
+}
+
+.qr-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 6px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+}
+
+.qr-loading {
+  width: 200px;
+  height: 200px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.qr-scanner-card {
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.qr-video-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #040c09;
+  border: 2px solid rgba(224, 185, 99, 0.45);
+}
+
+.qr-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.qr-reticle {
+  position: absolute;
+  inset: 14%;
+  border: 3px solid var(--gold-strong);
+  border-radius: 16px;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.qr-hidden-canvas {
+  display: none;
+}
+
+.qr-camera-fallback {
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(201, 54, 60, 0.12);
+  border: 1px solid rgba(201, 54, 60, 0.35);
+  text-align: center;
+}
+
+.qr-photo-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.qr-file-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.qr-file-input {
+  display: none;
+}

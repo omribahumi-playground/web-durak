@@ -3,14 +3,17 @@ import { GameTable } from './components/GameTable';
 import { HomeScreen } from './components/HomeScreen';
 import { LobbyView } from './components/LobbyView';
 import { PublicServerView } from './components/PublicServerView';
+import { QrCodeDisplay } from './components/QrCodeTools';
 import { RulesModal } from './components/RulesModal';
 import { useDurakSession } from './hooks/useDurakSession';
 import { usePublicServer } from './hooks/usePublicServer';
+import { usePwaInstall } from './hooks/usePwaInstall';
 import { buildTableListingFromLobby } from './net/publicServer';
 
 export const App: React.FC = () => {
   const session = useDurakSession();
   const publicServer = usePublicServer(session.localName);
+  const pwa = usePwaInstall();
 
   const [homeView, setHomeView] = useState<'home' | 'servers'>('home');
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -118,6 +121,9 @@ export const App: React.FC = () => {
           publicOnlineCount={publicServer.onlinePlayers.length}
           publicTablesCount={publicServer.tables.length}
           publicServerName={publicServer.activeServer.name}
+          canInstallPwa={pwa.canInstall}
+          isOffline={pwa.isOffline}
+          onInstallPwa={() => void pwa.promptInstall()}
           onOpenPublicServers={() => setHomeView('servers')}
           onCreateSolo={(maxPlayers) => {
             setIsPublicTable(false);
@@ -170,8 +176,12 @@ export const App: React.FC = () => {
             </p>
             {session.pendingManualAnswer && (
               <div className="manual-answer-wrap">
-                <label>Copy &amp; send this Answer Code to the host to complete the P2P link:</label>
-                <textarea readOnly rows={4} value={session.pendingManualAnswer} />
+                <QrCodeDisplay
+                  value={session.pendingManualAnswer}
+                  label="Have the host scan this Answer QR code:"
+                />
+                <label>Or copy &amp; send this Answer Code:</label>
+                <textarea readOnly rows={3} value={session.pendingManualAnswer} />
                 <button
                   type="button"
                   className="btn btn-gold btn-sm"

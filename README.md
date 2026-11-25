@@ -16,6 +16,9 @@ A 100% static browser-based **Durak** card game supporting **2–4 players** wit
   - **Classic (Throw-in)** and **Passing Mode** variants.
   - Optional 5-card first-bout cap (until first discard) and optional 4-player neighbors-only throw-in rule.
   - 5 AI difficulty levels (**Easy**, **Normal**, **Hard**, **Extreme**, **Master**—with card memory, Alpha-Beta 1v1 endgame solver, and Monte Carlo mid-game search), configurable globally or per bot seat.
+- **Offline PWA & Airplane / LAN QR Pairing**:
+  - Installable offline Progressive Web App (Service Worker caches all app assets for mid-flight / zero-internet play).
+  - Compact compressed WebRTC **QR Code Pairing** with live camera scanner (plus photo/screenshot scan fallback) to pair devices over a private Wi-Fi or personal hotspot in seconds with zero internet.
 - **High-Visibility Cards**:
   - Bold custom SVG suit icons, traditional pip layouts (`2`–`10`), court emblems, and an optional **4-Color Suits** accessibility toggle.
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { QrScannerModal } from './QrCodeTools';
 
 interface HomeScreenProps {
   localName: string;
@@ -7,6 +8,9 @@ interface HomeScreenProps {
   publicOnlineCount: number;
   publicTablesCount: number;
   publicServerName: string;
+  canInstallPwa: boolean;
+  isOffline: boolean;
+  onInstallPwa: () => void;
   onOpenPublicServers: () => void;
   onCreateSolo: (maxPlayers: 2 | 3 | 4) => void;
   onHostRoom: (maxPlayers: 2 | 3 | 4) => void;
@@ -22,6 +26,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   publicOnlineCount,
   publicTablesCount,
   publicServerName,
+  canInstallPwa,
+  isOffline,
+  onInstallPwa,
   onOpenPublicServers,
   onCreateSolo,
   onHostRoom,
@@ -32,8 +39,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [joinCode, setJoinCode] = useState(initialJoinCode);
   const [hostSize, setHostSize] = useState<2 | 3 | 4>(2);
   const [showManual, setShowManual] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [manualOffer, setManualOffer] = useState('');
-  const [manualAnswer, setManualAnswer] = useState('');
   const [manualError, setManualError] = useState('');
   const [manualBusy, setManualBusy] = useState(false);
 
@@ -44,14 +51,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onJoinRoom(cleaned);
   };
 
-  const handleManualJoin = async () => {
+  const handleManualJoin = async (codeOverride?: string) => {
+    const code = (codeOverride ?? manualOffer).trim();
+    if (!code) return;
     setManualError('');
     setManualBusy(true);
     try {
-      const answer = await onJoinManualOffer(manualOffer);
-      setManualAnswer(answer);
+      await onJoinManualOffer(code);
     } catch (err) {
       setManualError(err instanceof Error ? err.message : 'Invalid invite code.');
+      setShowManual(true);
     } finally {
       setManualBusy(false);
     }
@@ -84,6 +93,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <button type="button" className="btn btn-ghost" onClick={onOpenRules}>
             How to Play
           </button>
+          {canInstallPwa && (
+            <button type="button" className="btn btn-gold btn-sm" onClick={onInstallPwa}>
+              📲 Install Offline App
+            </button>
+          )}
+          {isOffline && (
+            <span className="status-pill status-connecting">
+              <span className="status-dot" />
+              Airplane / Offline Mode
+            </span>
+          )}
         </div>
       </div>
 
@@ -200,10 +220,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
           <button
             type="button"
+            className="btn btn-secondary btn-full"
+            disabled={manualBusy}
+            onClick={() => setScannerOpen(true)}
+          >
+            📷 Scan Host QR Code (Offline / LAN)
+          </button>
+
+          <button
+            type="button"
             className="link-toggle"
             onClick={() => setShowManual((v) => !v)}
           >
-            {showManual ? 'Hide' : 'Use'} Direct Manual P2P Code (Zero-Broker Fallback)
+            {showManual ? 'Hide' : 'Paste'} Direct Manual P2P Code
           </button>
 
           {showManual && (
@@ -220,19 +249,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 disabled={!manualOffer.trim() || manualBusy}
                 onClick={() => void handleManualJoin()}
               >
-                {manualBusy ? 'Generating Answer...' : 'Generate Answer Code'}
+                {manualBusy ? 'Generating Answer QR...' : 'Generate Answer QR & Code'}
               </button>
               {manualError && <p className="error-text">{manualError}</p>}
-              {manualAnswer && (
-                <div className="manual-answer-wrap">
-                  <label>Send this Answer Code back to the Host:</label>
-                  <textarea readOnly rows={3} value={manualAnswer} />
-                </div>
-              )}
             </div>
           )}
         </section>
       </div>
+
+      {scannerOpen && (
+        <QrScannerModal
+          title="Scan Host's Offer QR"
+          hint="Point your camera at the host's Direct P2P Offer QR code to pair over LAN or Wi-Fi."
+          onClose={() => setScannerOpen(false)}
+          onScan={(decoded) => {
+            setScannerOpen(false);
+            setManualOffer(decoded);
+            void handleManualJoin(decoded);
+          }}
+        />
+      )}
     </div>
   );
 };

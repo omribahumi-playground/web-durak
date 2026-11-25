@@ -1,3 +1,4 @@
+import { deflateSync, inflateSync } from 'fflate';
 import Peer, { DataConnection } from 'peerjs';
 import { HostToPeerMessage, PeerToHostMessage } from './protocol';
 
@@ -9,6 +10,7 @@ const ICE_SERVERS: RTCIceServer[] = [
 
 const ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const ROOM_PEER_PREFIX = 'durak-p2p-room-';
+const COMPACT_PREFIX = 'D2:';
 
 export function generateRoomCode(length = 6): string {
   let out = '';
@@ -27,25 +29,91 @@ export function generatePeerId(prefix = 'p'): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+/**
+ * Strips non-essential SDP lines from DataChannel-only descriptions while
+ * keeping all required session/DTLS/SCTP lines and LAN/STUN UDP candidates,
+ * making QR codes tiny and fast to scan on phone cameras.
+ */
+export function compactSdp(sdp: string): string {
+  const lines = sdp.replace(/\r\n/g, '\n').split('\n').filter(Boolean);
+  const kept: string[] = [];
+  const udpCandidates: string[] = [];
+  const tcpCandidates: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith('a=candidate:')) {
+      if (/\budp\b/i.test(line)) {
+        udpCandidates.push(line);
+      } else {
+        tcpCandidates.push(line);
+      }
+      continue;
+    }
+    if (
+      line.startsWith('v=') ||
+      line.startsWith('o=') ||
+      line.startsWith('s=') ||
+      line.startsWith('t=') ||
+      line.startsWith('c=') ||
+      line.startsWith('m=application') ||
+      line.startsWith('a=group:') ||
+      line.startsWith('a=msid-semantic:') ||
+      line.startsWith('a=ice-ufrag:') ||
+      line.startsWith('a=ice-pwd:') ||
+      line.startsWith('a=ice-options:') ||
+      line.startsWith('a=fingerprint:') ||
+      line.startsWith('a=setup:') ||
+      line.startsWith('a=mid:') ||
+      line.startsWith('a=sctp-port:') ||
+      line.startsWith('a=max-message-size:')
+    ) {
+      kept.push(line);
+    }
+  }
+
+  // Prefer UDP host/srflx candidates (best for LAN & direct P2P), cap at 8 to keep QR crisp
+  const chosenCandidates = (udpCandidates.length > 0 ? udpCandidates : tcpCandidates).slice(0, 8);
+  return `${[...kept, ...chosenCandidates].join('\r\n')}\r\n`;
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlToBytes(b64url: string): Uint8Array {
+  let b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4 !== 0) b64 += '=';
+  const binary = atob(b64);
+  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+}
+
 export function encodeSignalBlob(obj: unknown): string {
   const json = JSON.stringify(obj);
-  const bytes = new TextEncoder().encode(json);
-  let binary = '';
-  bytes.forEach((b) => {
-    binary += String.fromCharCode(b);
-  });
-  return btoa(binary);
+  const rawBytes = new TextEncoder().encode(json);
+  const compressed = deflateSync(rawBytes, { level: 9 });
+  return `${COMPACT_PREFIX}${bytesToBase64Url(compressed)}`;
 }
 
 export function decodeSignalBlob<T>(encoded: string): T {
   const clean = encoded.trim();
+  if (clean.startsWith(COMPACT_PREFIX)) {
+    const compressed = base64UrlToBytes(clean.slice(COMPACT_PREFIX.length));
+    const rawBytes = inflateSync(compressed);
+    const json = new TextDecoder().decode(rawBytes);
+    return JSON.parse(json) as T;
+  }
+  // Backwards-compatible fallback for uncompressed Base64 JSON blobs
   const binary = atob(clean);
   const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
   const json = new TextDecoder().decode(bytes);
   return JSON.parse(json) as T;
 }
 
-function waitForIceGathering(pc: RTCPeerConnection, timeoutMs = 2500): Promise<void> {
+function waitForIceGathering(pc: RTCPeerConnection, timeoutMs = 1800): Promise<void> {
   if (pc.iceGatheringState === 'complete') return Promise.resolve();
   return new Promise((resolve) => {
     let settled = false;
@@ -304,11 +372,12 @@ export class HostNetworkManager {
     await pc.setLocalDescription(offer);
     await waitForIceGathering(pc);
 
+    const local = pc.localDescription;
     const offerCode = encodeSignalBlob({
-      v: 1,
-      peerId,
-      roomCode: this.roomCode,
-      sdp: pc.localDescription,
+      v: 2,
+      r: this.roomCode,
+      t: local?.type ?? 'offer',
+      s: compactSdp(local?.sdp ?? ''),
     });
     return { peerId, offerCode };
   }
@@ -318,11 +387,20 @@ export class HostNetworkManager {
     if (!rec || rec.kind !== 'manual') {
       throw new Error('No pending direct invite found for that peer.');
     }
-    const payload = decodeSignalBlob<{ sdp: RTCSessionDescriptionInit }>(answerCode);
-    if (!payload?.sdp || payload.sdp.type !== 'answer') {
+    const payload = decodeSignalBlob<{
+      sdp?: RTCSessionDescriptionInit;
+      t?: RTCSdpType;
+      s?: string;
+    }>(answerCode);
+    const sdpDesc: RTCSessionDescriptionInit | null = payload?.sdp
+      ? payload.sdp
+      : payload?.t && payload?.s
+        ? { type: payload.t, sdp: payload.s }
+        : null;
+    if (!sdpDesc || sdpDesc.type !== 'answer') {
       throw new Error('Invalid answer code.');
     }
-    await rec.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+    await rec.pc.setRemoteDescription(new RTCSessionDescription(sdpDesc));
   }
 
   public sendToPeer(peerId: string, msg: HostToPeerMessage): void {
@@ -494,12 +572,20 @@ export class ClientNetworkManager {
   ): Promise<{ roomCode: string; answerCode: string }> {
     const payload = decodeSignalBlob<{
       roomCode?: string;
-      sdp: RTCSessionDescriptionInit;
+      r?: string;
+      sdp?: RTCSessionDescriptionInit;
+      t?: RTCSdpType;
+      s?: string;
     }>(offerCode);
-    if (!payload?.sdp || payload.sdp.type !== 'offer') {
+    const offerDesc: RTCSessionDescriptionInit | null = payload?.sdp
+      ? payload.sdp
+      : payload?.t && payload?.s
+        ? { type: payload.t, sdp: payload.s }
+        : null;
+    if (!offerDesc || offerDesc.type !== 'offer') {
       throw new Error('Invalid host offer code.');
     }
-    this.callbacks.onStatusChange('connecting', 'Waiting for host to apply answer code...');
+    this.callbacks.onStatusChange('connecting', 'Waiting for host to scan or apply your answer...');
 
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     this.manualPc = pc;
@@ -544,17 +630,18 @@ export class ClientNetworkManager {
       }
     };
 
-    await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+    await pc.setRemoteDescription(new RTCSessionDescription(offerDesc));
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     await waitForIceGathering(pc);
 
+    const local = pc.localDescription;
     const answerCode = encodeSignalBlob({
-      v: 1,
-      peerId: this.peerId,
-      sdp: pc.localDescription,
+      v: 2,
+      t: local?.type ?? 'answer',
+      s: compactSdp(local?.sdp ?? ''),
     });
-    return { roomCode: payload.roomCode || 'DIRECT', answerCode };
+    return { roomCode: payload.roomCode || payload.r || 'DIRECT', answerCode };
   }
 
   public send(msg: PeerToHostMessage): void {
