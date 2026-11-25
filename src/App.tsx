@@ -129,6 +129,10 @@ export const App: React.FC = () => {
             setIsPublicTable(false);
             session.createHostedLobby({ maxPlayers, fillWithBots: true });
           }}
+          onCreateAiBattle={(maxPlayers) => {
+            setIsPublicTable(false);
+            session.createHostedLobby({ maxPlayers, fillWithBots: true, aiOnly: true });
+          }}
           onHostRoom={(maxPlayers) => {
             setIsPublicTable(false);
             setPublicTableTitle(`${session.localName.trim() || 'Player'}'s Table`);
@@ -239,9 +243,13 @@ export const App: React.FC = () => {
           rttMs={session.rttMs}
           soundEnabled={session.soundEnabled}
           fourColorDeck={fourColorDeck}
+          botSpeed={session.botSpeed}
+          botsPaused={session.botsPaused}
           chatMessages={session.chatMessages}
           onToggleSound={session.toggleSound}
           onToggleFourColorDeck={toggleFourColorDeck}
+          onChangeBotSpeed={session.changeBotSpeed}
+          onToggleBotsPaused={session.toggleBotsPaused}
           onAction={session.sendAction}
           onSendChat={session.sendChat}
           onPlayAgain={session.startGame}

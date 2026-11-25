@@ -167,3 +167,23 @@ export const IconMegaphone: React.FC<IconProps> = ({ size = 15, className = '' }
     <path d="M19 7a7 7 0 0 1 0 10" />
   </svg>
 );
+
+export const IconEye: React.FC<IconProps> = ({ size = 15, className = '' }) => (
+  <svg {...baseProps(size, className)}>
+    <path d="M2 12s3.8-7 10-7 10 7 10 7-3.8 7-10 7-10-7-10-7z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+export const IconPause: React.FC<IconProps> = ({ size = 14, className = '' }) => (
+  <svg {...baseProps(size, className)}>
+    <rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none" />
+    <rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+export const IconPlay: React.FC<IconProps> = ({ size = 14, className = '' }) => (
+  <svg {...baseProps(size, className)}>
+    <path d="M6 4l14 8-14 8V4z" fill="currentColor" stroke="none" />
+  </svg>
+);

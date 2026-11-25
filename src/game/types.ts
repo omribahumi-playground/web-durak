@@ -115,6 +115,7 @@ export interface ClientGameState {
   players: PublicPlayerState[];
   myPlayerId: string;
   myHand: Card[];
+  revealedHands?: Record<string, Card[]>;
   attackerIndex: number;
   defenderIndex: number;
   table: TablePair[];

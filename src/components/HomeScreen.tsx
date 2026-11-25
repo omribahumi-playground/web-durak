@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { IconBook, IconDownload, IconGlobe, IconQr } from './Icons';
+import { IconBook, IconDownload, IconEye, IconGlobe, IconQr } from './Icons';
 import { QrScannerModal } from './QrCodeTools';
 
 interface HomeScreenProps {
@@ -14,6 +14,7 @@ interface HomeScreenProps {
   onInstallPwa: () => void;
   onOpenPublicServers: () => void;
   onCreateSolo: (maxPlayers: 2 | 3 | 4) => void;
+  onCreateAiBattle: (maxPlayers: 2 | 3 | 4) => void;
   onHostRoom: (maxPlayers: 2 | 3 | 4) => void;
   onJoinRoom: (roomCode: string) => void;
   onJoinManualOffer: (offerCode: string) => Promise<string>;
@@ -32,6 +33,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onInstallPwa,
   onOpenPublicServers,
   onCreateSolo,
+  onCreateAiBattle,
   onHostRoom,
   onJoinRoom,
   onJoinManualOffer,
@@ -164,6 +166,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               onClick={() => onCreateSolo(4)}
             >
               4 Players (3 Bots)
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-icon-row"
+              onClick={() => onCreateAiBattle(4)}
+            >
+              <IconEye size={15} />
+              <span>Watch AI Battle (Bots Only)</span>
             </button>
           </div>
         </section>

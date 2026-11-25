@@ -200,6 +200,24 @@ describe('Durak Engine', () => {
     expect('deck' in guestView).toBe(false);
     expect('hand' in guestView.players[0]).toBe(false);
     expect(guestView.players[0].cardCount).toBe(6);
+    expect(guestView.revealedHands).toBeUndefined();
+
+    // Even if revealAllForSpectator=true is requested on a game with humans, hands stay hidden!
+    const blockedReveal = sanitizeGameStateForPlayer(state, 'spectator', true);
+    expect(blockedReveal.revealedHands).toBeUndefined();
+
+    // In a pure AI-only game, a spectator can view all bot hands
+    const botState = createInitialGameState(
+      [
+        { id: 'b1', name: 'Bot 1', type: 'bot' },
+        { id: 'b2', name: 'Bot 2', type: 'bot' },
+      ],
+      DEFAULT_SETTINGS,
+      deterministicRng(4),
+    );
+    const specView = sanitizeGameStateForPlayer(botState, 'host-spectator', true);
+    expect(specView.revealedHands?.b1).toEqual(botState.players[0].hand);
+    expect(specView.revealedHands?.b2).toEqual(botState.players[1].hand);
   });
 
   it('supports 24-card, 36-card, and 52-card decks including 4-player full-deal 24-card deck', () => {

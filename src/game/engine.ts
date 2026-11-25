@@ -828,8 +828,15 @@ export function applyGameAction(
 export function sanitizeGameStateForPlayer(
   state: GameState,
   viewerId: string,
+  revealAllForSpectator = false,
 ): ClientGameState {
   const viewer = state.players.find((p) => p.id === viewerId);
+  const isAllBots = state.players.every((p) => p.type === 'bot');
+  const revealedHands =
+    revealAllForSpectator && isAllBots && !viewer
+      ? Object.fromEntries(state.players.map((p) => [p.id, [...p.hand]]))
+      : undefined;
+
   return {
     id: state.id,
     settings: state.settings,
@@ -853,6 +860,7 @@ export function sanitizeGameStateForPlayer(
     })),
     myPlayerId: viewerId,
     myHand: viewer ? [...viewer.hand] : [],
+    revealedHands,
     attackerIndex: state.attackerIndex,
     defenderIndex: state.defenderIndex,
     table: state.table.map((pair) => ({

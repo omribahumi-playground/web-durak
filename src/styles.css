@@ -3027,3 +3027,55 @@ textarea:focus {
     animation: none !important;
   }
 }
+
+/* ---------- AI-Only Spectator Mode ---------- */
+.speed-pills {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(5, 14, 11, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.speed-pill {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 4px 7px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.speed-pill.active {
+  background: rgba(224, 185, 99, 0.25);
+  color: var(--gold-strong);
+}
+
+.opponent-revealed-fan {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px 0;
+  max-width: 240px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.opponent-revealed-fan::-webkit-scrollbar {
+  display: none;
+}
+
+.revealed-opp-card {
+  margin-left: -28px;
+  transform: scale(0.84);
+  transform-origin: center bottom;
+}
+
+.revealed-opp-card:first-child {
+  margin-left: 0;
+}

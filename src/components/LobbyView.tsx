@@ -100,6 +100,9 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   const isHost = role === 'host';
   const filledCount = lobby.seats.filter((s) => s.kind !== 'open').length;
   const openCount = lobby.seats.length - filledCount;
+  const isAiOnlyLobby =
+    filledCount >= 2 &&
+    lobby.seats.every((s) => s.kind === 'bot' || s.kind === 'open');
 
   const copyText = (text: string, which: 'code' | 'link' | 'offer') => {
     void navigator.clipboard?.writeText(text);
@@ -460,9 +463,44 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                       </div>
                     </div>
 
-                    {isHost && seat.seatIndex > 0 && (
+                    {isHost && (
                       <div className="seat-controls">
-                        {seat.kind === 'open' && (
+                        {seat.seatIndex === 0 && seat.kind === 'host' && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => onToggleSeatBot(0)}
+                            title="Replace your seat with a bot so you can spectate an AI battle"
+                          >
+                            Spectate (Use Bot)
+                          </button>
+                        )}
+                        {seat.seatIndex === 0 && seat.kind === 'bot' && (
+                          <>
+                            <select
+                              className="bot-level-select"
+                              aria-label={`${seat.name} difficulty`}
+                              value={seat.botDifficulty ?? lobby.settings.botDifficulty}
+                              onChange={(e) =>
+                                onSetSeatBotDifficulty(0, e.target.value as BotDifficulty)
+                              }
+                            >
+                              {BOT_DIFFICULTIES.map((lvl) => (
+                                <option key={lvl} value={lvl}>
+                                  {BOT_DIFFICULTY_LABELS[lvl]}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => onToggleSeatBot(0)}
+                            >
+                              Take Seat
+                            </button>
+                          </>
+                        )}
+                        {seat.seatIndex > 0 && seat.kind === 'open' && (
                           <button
                             type="button"
                             className="btn btn-secondary btn-sm"
@@ -471,7 +509,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                             + Add Bot
                           </button>
                         )}
-                        {seat.kind === 'bot' && (
+                        {seat.seatIndex > 0 && seat.kind === 'bot' && (
                           <>
                             <select
                               className="bot-level-select"
@@ -499,7 +537,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                             </button>
                           </>
                         )}
-                        {seat.kind === 'remote' && (
+                        {seat.seatIndex > 0 && seat.kind === 'remote' && (
                           <button
                             type="button"
                             className="btn btn-danger-ghost btn-sm"
@@ -527,7 +565,9 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               >
                 {filledCount < 2
                   ? 'Add a Bot or Wait for a Friend (Min 2 Players)'
-                  : `Deal Cards & Start ${filledCount}-Player Match`}
+                  : isAiOnlyLobby
+                    ? `Watch ${filledCount}-Bot AI Battle`
+                    : `Deal Cards & Start ${filledCount}-Player Match`}
               </button>
             ) : (
               <div className="waiting-banner">

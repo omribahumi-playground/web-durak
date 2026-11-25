@@ -27,7 +27,9 @@ import {
 } from '../net/webrtc';
 
 const BOT_NAMES = ['Alex AI', 'Morgan AI', 'Riley AI', 'Casey AI'];
+const AI_BATTLE_PRESETS: BotDifficulty[] = ['master', 'normal', 'extreme', 'easy'];
 
+export type BotSpeed = 0.5 | 1 | 2 | 4;
 export type SessionRole = 'home' | 'host' | 'guest';
 
 function buildInitialSeats(
@@ -36,7 +38,23 @@ function buildInitialSeats(
   maxPlayers: 2 | 3 | 4,
   defaultBotDifficulty: BotDifficulty,
   fillWithBots: boolean,
+  aiOnly = false,
 ): LobbySeat[] {
+  if (aiOnly) {
+    const seats: LobbySeat[] = [];
+    for (let i = 0; i < maxPlayers; i++) {
+      seats.push({
+        seatIndex: i,
+        kind: 'bot',
+        playerId: `bot-${i}`,
+        name: BOT_NAMES[i % BOT_NAMES.length],
+        botDifficulty: AI_BATTLE_PRESETS[i % AI_BATTLE_PRESETS.length],
+        connected: true,
+      });
+    }
+    return seats;
+  }
+
   const seats: LobbySeat[] = [
     {
       seatIndex: 0,
@@ -88,12 +106,16 @@ export function useDurakSession() {
   const [rttMs, setRttMs] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [botSpeed, setBotSpeed] = useState<BotSpeed>(1);
+  const [botsPaused, setBotsPaused] = useState<boolean>(false);
 
   const hostNetRef = useRef<HostNetworkManager | null>(null);
   const clientNetRef = useRef<ClientNetworkManager | null>(null);
   const lobbyRef = useRef<LobbyState | null>(null);
   const gameRef = useRef<GameState | null>(null);
   const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const botSpeedRef = useRef<BotSpeed>(1);
+  const botsPausedRef = useRef<boolean>(false);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((msg: string) => {
@@ -138,8 +160,11 @@ export function useDurakSession() {
       return;
     }
 
-    // Update host's own sanitized view
-    setClientGame(sanitizeGameStateForPlayer(nextGame, currentLobby.hostId));
+    // Update host's own sanitized view (reveal all bot hands if host is spectating an AI-only match)
+    const isAllBotSpectate = nextGame.players.every((p) => p.type === 'bot');
+    setClientGame(
+      sanitizeGameStateForPlayer(nextGame, currentLobby.hostId, isAllBotSpectate),
+    );
     if (soundEvent) {
       soundEngine.play(soundEvent);
     }
@@ -151,7 +176,7 @@ export function useDurakSession() {
         if (seat.kind === 'remote' && seat.peerId && seat.connected) {
           hostNet.sendToPeer(seat.peerId, {
             type: 'game_state',
-            state: sanitizeGameStateForPlayer(nextGame, seat.playerId),
+            state: sanitizeGameStateForPlayer(nextGame, seat.playerId, false),
             soundEvent,
           });
         }
@@ -165,19 +190,21 @@ export function useDurakSession() {
       botTimerRef.current = null;
     }
     const currentGame = gameRef.current;
-    if (!currentGame || currentGame.phase !== 'playing') return;
+    if (!currentGame || currentGame.phase !== 'playing' || botsPausedRef.current) return;
 
     const nextBotAction = pickNextBotAction(currentGame);
     if (!nextBotAction) return;
 
-    const delayMs =
+    const baseDelayMs =
       nextBotAction.type === 'pass_turn'
         ? 620
         : nextBotAction.type === 'take'
           ? 700
           : 780;
+    const delayMs = Math.max(120, Math.round(baseDelayMs / botSpeedRef.current));
 
     botTimerRef.current = setTimeout(() => {
+      if (botsPausedRef.current) return;
       const latest = gameRef.current;
       if (!latest || latest.phase !== 'playing') return;
       const actionNow = pickNextBotAction(latest);
@@ -189,6 +216,33 @@ export function useDurakSession() {
       }
     }, delayMs);
   }, [syncGameToAll]);
+
+  const changeBotSpeed = useCallback(
+    (speed: BotSpeed) => {
+      botSpeedRef.current = speed;
+      setBotSpeed(speed);
+      if (!botsPausedRef.current) {
+        scheduleBotIfNeeded();
+      }
+    },
+    [scheduleBotIfNeeded],
+  );
+
+  const toggleBotsPaused = useCallback(() => {
+    setBotsPaused((prev) => {
+      const next = !prev;
+      botsPausedRef.current = next;
+      if (next) {
+        if (botTimerRef.current) {
+          clearTimeout(botTimerRef.current);
+          botTimerRef.current = null;
+        }
+      } else {
+        scheduleBotIfNeeded();
+      }
+      return next;
+    });
+  }, [scheduleBotIfNeeded]);
 
   const executeHostAction = useCallback(
     (action: GameAction, fromPeerId?: string) => {
@@ -245,6 +299,10 @@ export function useDurakSession() {
     setPendingManualAnswer(null);
     setConnectionNote('');
     setRttMs(null);
+    botsPausedRef.current = false;
+    setBotsPaused(false);
+    botSpeedRef.current = 1;
+    setBotSpeed(1);
     setRole('home');
   }, []);
 
@@ -261,6 +319,7 @@ export function useDurakSession() {
     (options?: {
       maxPlayers?: 2 | 3 | 4;
       fillWithBots?: boolean;
+      aiOnly?: boolean;
       playerName?: string;
     }) => {
       cleanupAll();
@@ -462,6 +521,7 @@ export function useDurakSession() {
           settings.maxPlayers,
           settings.botDifficulty,
           options?.fillWithBots ?? false,
+          options?.aiOnly ?? false,
         ),
         inGame: false,
       };
@@ -628,9 +688,35 @@ export function useDurakSession() {
   const toggleSeatBot = useCallback(
     (seatIndex: number) => {
       const cur = lobbyRef.current;
-      if (!cur || role !== 'host' || cur.inGame || seatIndex === 0) return;
+      if (!cur || role !== 'host' || cur.inGame) return;
       const target = cur.seats[seatIndex];
       if (!target) return;
+
+      // Seat 0 toggles between Host Playing and AI Bot (Host Spectating!)
+      if (seatIndex === 0) {
+        const nextSeats = cur.seats.map((s, idx) => {
+          if (idx !== 0) return s;
+          if (s.kind === 'bot') {
+            return {
+              seatIndex: 0,
+              kind: 'host' as const,
+              playerId: cur.hostId,
+              name: localName.trim() || 'Player',
+              connected: true,
+            };
+          }
+          return {
+            seatIndex: 0,
+            kind: 'bot' as const,
+            playerId: `bot-0-${Math.random().toString(36).slice(2, 5)}`,
+            name: BOT_NAMES[0],
+            botDifficulty: cur.settings.botDifficulty,
+            connected: true,
+          };
+        });
+        syncLobbyToPeers({ ...cur, seats: nextSeats });
+        return;
+      }
 
       if (target.kind === 'remote' && target.peerId) {
         hostNetRef.current?.disconnectPeer(target.peerId, 'Removed from lobby by host.');
@@ -651,7 +737,7 @@ export function useDurakSession() {
           seatIndex: idx,
           kind: 'bot' as const,
           playerId: `bot-${idx}-${Math.random().toString(36).slice(2, 5)}`,
-          name: BOT_NAMES[(idx - 1) % BOT_NAMES.length],
+          name: BOT_NAMES[idx % BOT_NAMES.length],
           botDifficulty: cur.settings.botDifficulty,
           connected: true,
         };
@@ -659,7 +745,7 @@ export function useDurakSession() {
 
       syncLobbyToPeers({ ...cur, seats: nextSeats });
     },
-    [role, syncLobbyToPeers],
+    [localName, role, syncLobbyToPeers],
   );
 
   const setSeatBotDifficulty = useCallback(
@@ -715,6 +801,9 @@ export function useDurakSession() {
 
     const nextLobby: LobbyState = { ...cur, inGame: true };
     syncLobbyToPeers(nextLobby);
+
+    botsPausedRef.current = false;
+    setBotsPaused(false);
 
     const newGame = createInitialGameState(seeds, {
       ...cur.settings,
@@ -785,6 +874,10 @@ export function useDurakSession() {
     toast,
     soundEnabled,
     toggleSound,
+    botSpeed,
+    botsPaused,
+    changeBotSpeed,
+    toggleBotsPaused,
     createHostedLobby,
     joinRoomByCode,
     joinManualOffer,

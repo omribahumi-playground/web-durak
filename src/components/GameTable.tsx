@@ -23,9 +23,12 @@ import {
   IconBot,
   IconChat,
   IconClose,
+  IconEye,
   IconHand,
   IconMenu,
   IconPalette,
+  IconPause,
+  IconPlay,
   IconShield,
   IconSort,
   IconSoundOff,
@@ -34,6 +37,7 @@ import {
   IconTrophy,
   IconUser,
 } from './Icons';
+import { BotSpeed } from '../hooks/useDurakSession';
 import { PlayingCard, SUIT_NAMES, SuitIcon } from './PlayingCard';
 
 interface GameTableProps {
@@ -43,9 +47,13 @@ interface GameTableProps {
   rttMs: number | null;
   soundEnabled: boolean;
   fourColorDeck: boolean;
+  botSpeed: BotSpeed;
+  botsPaused: boolean;
   chatMessages: ChatMessage[];
   onToggleSound: () => void;
   onToggleFourColorDeck: () => void;
+  onChangeBotSpeed: (speed: BotSpeed) => void;
+  onToggleBotsPaused: () => void;
   onAction: (action: GameAction) => void;
   onSendChat: (text: string) => void;
   onPlayAgain: () => void;
@@ -55,6 +63,7 @@ interface GameTableProps {
 }
 
 const QUICK_EMOTES = ['Nice move!', 'Taking it 😅', 'Clean defense!', 'Good game!'];
+const BOT_SPEEDS: BotSpeed[] = [0.5, 1, 2, 4];
 
 export const GameTable: React.FC<GameTableProps> = ({
   role,
@@ -63,9 +72,13 @@ export const GameTable: React.FC<GameTableProps> = ({
   rttMs,
   soundEnabled,
   fourColorDeck,
+  botSpeed,
+  botsPaused,
   chatMessages,
   onToggleSound,
   onToggleFourColorDeck,
+  onChangeBotSpeed,
+  onToggleBotsPaused,
   onAction,
   onSendChat,
   onPlayAgain,
@@ -77,16 +90,25 @@ export const GameTable: React.FC<GameTableProps> = ({
   const [sortMode, setSortMode] = useState<'suit' | 'rank'>('suit');
   const [chatOpen, setChatOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showAllHands, setShowAllHands] = useState(true);
   const [chatInput, setChatInput] = useState('');
 
   const myIndex = game.players.findIndex((p) => p.id === game.myPlayerId);
-  const me = game.players[myIndex];
-  const isDefender = myIndex === game.defenderIndex;
-  const isMainAttacker = myIndex === game.attackerIndex;
+  const isSpectator = myIndex === -1;
+  const bottomIndex = isSpectator ? 0 : myIndex;
+  const me = game.players[bottomIndex];
+  const isDefender = !isSpectator && myIndex === game.defenderIndex;
+  const isMainAttacker = !isSpectator && myIndex === game.attackerIndex;
+
+  const bottomCardsRaw = isSpectator
+    ? showAllHands && game.revealedHands && me
+      ? game.revealedHands[me.id] ?? []
+      : []
+    : game.myHand;
 
   const sortedHand = useMemo(
-    () => sortHand(game.myHand, game.trumpSuit, sortMode),
-    [game.myHand, game.trumpSuit, sortMode],
+    () => sortHand(bottomCardsRaw, game.trumpSuit, sortMode),
+    [bottomCardsRaw, game.trumpSuit, sortMode],
   );
 
   // Clear selection if selected card left hand
@@ -100,15 +122,15 @@ export const GameTable: React.FC<GameTableProps> = ({
     return out;
   }, [game.table]);
 
-  // Arrange opponents clockwise starting after local player
+  // Arrange opponents clockwise starting after the bottom seat
   const opponents = useMemo(() => {
     const list: { player: PublicPlayerState; seatIdx: number; position: 'left' | 'top' | 'right' }[] = [];
     const total = game.players.length;
-    if (myIndex === -1) return list;
+    if (bottomIndex === -1 || total === 0) return list;
 
     const ordered: { player: PublicPlayerState; seatIdx: number }[] = [];
     for (let offset = 1; offset < total; offset++) {
-      const seatIdx = (myIndex + offset) % total;
+      const seatIdx = (bottomIndex + offset) % total;
       ordered.push({ player: game.players[seatIdx], seatIdx });
     }
 
@@ -123,7 +145,7 @@ export const GameTable: React.FC<GameTableProps> = ({
       list.push({ ...ordered[2], position: 'right' });
     }
     return list;
-  }, [game.players, myIndex]);
+  }, [bottomIndex, game.players]);
 
   const engineAdapter = useMemo(
     () => ({
@@ -297,6 +319,11 @@ export const GameTable: React.FC<GameTableProps> = ({
   const getTurnPrompt = (): string => {
     if (game.phase === 'finished') {
       return game.lastActionText;
+    }
+    if (isSpectator) {
+      return botsPaused
+        ? 'AI Battle Paused — press Resume to continue.'
+        : game.lastActionText;
     }
     const attackerName = game.players[game.attackerIndex]?.name ?? 'Attacker';
     const defenderName = game.players[game.defenderIndex]?.name ?? 'Defender';
@@ -599,19 +626,33 @@ export const GameTable: React.FC<GameTableProps> = ({
                   </span>
                 )}
               </div>
-              <div className="opponent-fan" aria-label={`${player.cardCount} cards`}>
-                {Array.from({ length: fanCount }).map((_, idx) => (
-                  <PlayingCard
-                    key={idx}
-                    faceDown
-                    size="xs"
-                    className="fan-mini-card"
-                    style={{
-                      transform: `translateX(${(idx - (fanCount - 1) / 2) * 14}px) rotate(${(idx - (fanCount - 1) / 2) * 4}deg)`,
-                    }}
-                  />
-                ))}
-              </div>
+              {isSpectator && showAllHands && game.revealedHands?.[player.id] ? (
+                <div className="opponent-revealed-fan" aria-label={`${player.name}'s revealed hand`}>
+                  {sortHand(game.revealedHands[player.id], game.trumpSuit, 'suit').map((c) => (
+                    <PlayingCard
+                      key={c.id}
+                      card={c}
+                      isTrump={c.suit === game.trumpSuit}
+                      size="sm"
+                      className="revealed-opp-card"
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="opponent-fan" aria-label={`${player.cardCount} cards`}>
+                  {Array.from({ length: fanCount }).map((_, idx) => (
+                    <PlayingCard
+                      key={idx}
+                      faceDown
+                      size="xs"
+                      className="fan-mini-card"
+                      style={{
+                        transform: `translateX(${(idx - (fanCount - 1) / 2) * 14}px) rotate(${(idx - (fanCount - 1) / 2) * 4}deg)`,
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
@@ -738,8 +779,8 @@ export const GameTable: React.FC<GameTableProps> = ({
         {/* Bottom Player Dock */}
         <section
           className={`player-dock ${
-            myIndex !== -1 && activeTurnIndices.has(myIndex)
-              ? isDefender
+            activeTurnIndices.has(bottomIndex)
+              ? bottomIndex === game.defenderIndex
                 ? 'dock-acting-def'
                 : 'dock-acting-atk'
               : ''
@@ -748,6 +789,41 @@ export const GameTable: React.FC<GameTableProps> = ({
           <div className="prompt-strip">
             <div className="prompt-text">{getTurnPrompt()}</div>
             <div className="action-buttons">
+              {isSpectator && (
+                <>
+                  <button
+                    type="button"
+                    className={`btn btn-xs btn-icon-row ${botsPaused ? 'btn-gold' : 'btn-secondary'}`}
+                    onClick={onToggleBotsPaused}
+                  >
+                    {botsPaused ? <IconPlay size={12} /> : <IconPause size={12} />}
+                    <span>{botsPaused ? 'Resume' : 'Pause'}</span>
+                  </button>
+                  <div className="speed-pills" role="group" aria-label="AI playback speed">
+                    {BOT_SPEEDS.map((spd) => (
+                      <button
+                        key={spd}
+                        type="button"
+                        className={`speed-pill ${botSpeed === spd ? 'active' : ''}`}
+                        onClick={() => onChangeBotSpeed(spd)}
+                      >
+                        {spd}×
+                      </button>
+                    ))}
+                  </div>
+                  {game.revealedHands && (
+                    <button
+                      type="button"
+                      className={`btn btn-xs btn-icon-row ${showAllHands ? 'btn-primary' : 'btn-ghost'}`}
+                      onClick={() => setShowAllHands((v) => !v)}
+                    >
+                      <IconEye size={13} />
+                      <span>{showAllHands ? 'Hands: Open' : 'Hands: Hidden'}</span>
+                    </button>
+                  )}
+                </>
+              )}
+
               {selectedCard && selectedCanPassAttack && (
                 <button
                   type="button"
@@ -795,10 +871,18 @@ export const GameTable: React.FC<GameTableProps> = ({
 
           <div className="my-info-bar">
             <div className="my-identity">
+              {isSpectator && (
+                <span className="tag tag-gold">Spectating</span>
+              )}
               <strong>{me?.name ?? 'You'}</strong>
-              <span className="muted-tiny">({sortedHand.length} cards)</span>
+              {isSpectator && me?.botDifficulty && (
+                <span className={`tag tag-bot tag-bot-${me.botDifficulty}`}>
+                  {BOT_DIFFICULTY_LABELS[me.botDifficulty]}
+                </span>
+              )}
+              <span className="muted-tiny">({me?.cardCount ?? sortedHand.length} cards)</span>
               {me && (() => {
-                const badge = getRoleBadge(myIndex, me);
+                const badge = getRoleBadge(bottomIndex, me);
                 return badge ? (
                   <span className={`role-pill ${badge.cls}`}>
                     {badge.icon}
@@ -806,6 +890,13 @@ export const GameTable: React.FC<GameTableProps> = ({
                   </span>
                 ) : null;
               })()}
+              {isSpectator && activeTurnIndices.has(bottomIndex) && !botsPaused && (
+                <span className="thinking-dots" aria-label="Thinking">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              )}
             </div>
 
             <button
@@ -819,26 +910,37 @@ export const GameTable: React.FC<GameTableProps> = ({
           </div>
 
           <div className="hand-tray">
-            {sortedHand.length === 0 ? (
+            {isSpectator && !showAllHands ? (
+              Array.from({ length: Math.min(me?.cardCount ?? 0, 10) }).map((_, idx) => (
+                <PlayingCard
+                  key={`spec-back-${idx}`}
+                  faceDown
+                  size="lg"
+                  className="hand-card"
+                />
+              ))
+            ) : sortedHand.length === 0 ? (
               <div className="empty-hand-msg">
                 {me?.isOut
-                  ? 'You emptied your hand — safe from being the Durak!'
+                  ? isSpectator
+                    ? `${me.name} emptied their hand!`
+                    : 'You emptied your hand — safe from being the Durak!'
                   : 'No cards in hand.'}
               </div>
             ) : (
               sortedHand.map((card) => {
-                const playable = isCardPlayable(card);
+                const playable = !isSpectator && isCardPlayable(card);
                 return (
                   <PlayingCard
                     key={card.id}
                     card={card}
                     isTrump={card.suit === game.trumpSuit}
-                    selected={selectedCardId === card.id}
+                    selected={!isSpectator && selectedCardId === card.id}
                     playable={playable}
-                    disabled={!playable}
+                    disabled={!isSpectator && !playable}
                     size="lg"
                     className="hand-card"
-                    onClick={() => handleCardClick(card)}
+                    onClick={isSpectator ? undefined : () => handleCardClick(card)}
                   />
                 );
               })
@@ -904,9 +1006,11 @@ export const GameTable: React.FC<GameTableProps> = ({
             <p className="muted">
               {game.isDraw
                 ? 'Everyone cleared their hand on the final bout.'
-                : game.durakId === game.myPlayerId
-                  ? 'You were the last player holding cards — better luck next deal!'
-                  : 'Well played! You escaped being the Durak.'}
+                : isSpectator
+                  ? 'AI battle complete! Deal again or tweak bot difficulties in the lobby.'
+                  : game.durakId === game.myPlayerId
+                    ? 'You were the last player holding cards — better luck next deal!'
+                    : 'Well played! You escaped being the Durak.'}
             </p>
 
             <div className="standings-list">
