@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { IconBook, IconDownload, IconGlobe, IconQr } from './Icons';
 import { QrScannerModal } from './QrCodeTools';
 
 interface HomeScreenProps {
@@ -90,12 +91,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onChange={(e) => onNameChange(e.target.value)}
             placeholder="Enter display name"
           />
-          <button type="button" className="btn btn-ghost" onClick={onOpenRules}>
-            How to Play
+          <button type="button" className="btn btn-ghost btn-icon-row" onClick={onOpenRules}>
+            <IconBook size={15} />
+            <span>How to Play</span>
           </button>
           {canInstallPwa && (
-            <button type="button" className="btn btn-gold btn-sm" onClick={onInstallPwa}>
-              📲 Install Offline App
+            <button type="button" className="btn btn-gold btn-sm btn-icon-row" onClick={onInstallPwa}>
+              <IconDownload size={15} />
+              <span>Install Offline App</span>
             </button>
           )}
           {isOffline && (
@@ -123,10 +126,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
           <button
             type="button"
-            className="btn btn-primary btn-lg"
+            className="btn btn-primary btn-lg btn-icon-row"
             onClick={onOpenPublicServers}
           >
-            🌐 Enter Public Servers
+            <IconGlobe size={17} />
+            <span>Enter Public Servers</span>
           </button>
         </div>
       </section>
@@ -220,11 +224,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
           <button
             type="button"
-            className="btn btn-secondary btn-full"
+            className="btn btn-secondary btn-full btn-icon-row"
             disabled={manualBusy}
             onClick={() => setScannerOpen(true)}
           >
-            📷 Scan Host QR Code (Offline / LAN)
+            <IconQr size={15} />
+            <span>Scan Host QR Code (Offline / LAN)</span>
           </button>
 
           <button

@@ -6,6 +6,7 @@ import {
   canPassAttackCard,
   canPlayAttackCard,
   canPlayerPassTurn,
+  getEligibleAttackerIndices,
   getMaxTableAttacks,
   sortHand,
 } from '../game/engine';
@@ -17,6 +18,22 @@ import {
   GameAction,
   PublicPlayerState,
 } from '../game/types';
+import {
+  IconBook,
+  IconBot,
+  IconChat,
+  IconClose,
+  IconHand,
+  IconMenu,
+  IconPalette,
+  IconShield,
+  IconSort,
+  IconSoundOff,
+  IconSoundOn,
+  IconSword,
+  IconTrophy,
+  IconUser,
+} from './Icons';
 import { PlayingCard, SUIT_NAMES, SuitIcon } from './PlayingCard';
 
 interface GameTableProps {
@@ -219,24 +236,60 @@ export const GameTable: React.FC<GameTableProps> = ({
     }
   };
 
+  // Precisely determine which seat(s) are currently expected to act!
+  const activeTurnIndices = useMemo(() => {
+    const set = new Set<number>();
+    if (game.phase !== 'playing') return set;
+    if (game.subPhase === 'initial_attack') {
+      set.add(game.attackerIndex);
+      return set;
+    }
+    if (game.subPhase === 'battle' && undefendedIndices.length > 0) {
+      set.add(game.defenderIndex);
+      return set;
+    }
+    // All attacks defended OR defender taking -> eligible attackers who haven't passed and still hold cards
+    const eligible = getEligibleAttackerIndices(engineAdapter);
+    for (const idx of eligible) {
+      const p = game.players[idx];
+      if (p && !p.isOut && p.cardCount > 0 && !game.passedPlayerIds.includes(p.id)) {
+        set.add(idx);
+      }
+    }
+    return set;
+  }, [
+    engineAdapter,
+    game.attackerIndex,
+    game.defenderIndex,
+    game.passedPlayerIds,
+    game.phase,
+    game.players,
+    game.subPhase,
+    undefendedIndices.length,
+  ]);
+
   const getRoleBadge = (seatIdx: number, player: PublicPlayerState) => {
     if (game.phase === 'finished') {
-      if (game.durakId === player.id) return { text: '🃏 DURAK', cls: 'role-durak' };
-      if (player.finishOrder) return { text: `🏆 #${player.finishOrder}`, cls: 'role-winner' };
+      if (game.durakId === player.id) {
+        return { icon: null, text: 'DURAK', cls: 'role-durak' };
+      }
+      if (player.finishOrder) {
+        return { icon: <IconTrophy size={12} />, text: `#${player.finishOrder}`, cls: 'role-winner' };
+      }
     }
     if (player.isOut) {
-      return { text: `🏆 Out #${player.finishOrder}`, cls: 'role-winner' };
+      return { icon: <IconTrophy size={12} />, text: `Out #${player.finishOrder}`, cls: 'role-winner' };
     }
     if (seatIdx === game.defenderIndex) {
       return game.subPhase === 'taking'
-        ? { text: '✋ Taking', cls: 'role-taking' }
-        : { text: '🛡️ Defender', cls: 'role-defender' };
+        ? { icon: <IconHand size={12} />, text: 'Taking', cls: 'role-taking' }
+        : { icon: <IconShield size={12} />, text: 'Defender', cls: 'role-defender' };
     }
     if (seatIdx === game.attackerIndex) {
-      return { text: '⚔️ Attacker', cls: 'role-attacker' };
+      return { icon: <IconSword size={12} />, text: 'Attacker', cls: 'role-attacker' };
     }
     if (game.passedPlayerIds.includes(player.id)) {
-      return { text: '✓ Passed', cls: 'role-passed' };
+      return { icon: null, text: 'Passed', cls: 'role-passed' };
     }
     return null;
   };
@@ -322,35 +375,41 @@ export const GameTable: React.FC<GameTableProps> = ({
           )}
           <button
             type="button"
-            className={`btn btn-xs hud-desktop-only ${fourColorDeck ? 'btn-gold' : 'btn-ghost'}`}
+            className={`btn btn-xs btn-icon-row hud-desktop-only ${fourColorDeck ? 'btn-gold' : 'btn-ghost'}`}
             onClick={onToggleFourColorDeck}
             title="Use distinct colors for all four suits (Black Spades, Red Hearts, Blue Diamonds, Green Clubs)"
           >
-            {fourColorDeck ? '🎨 4-Color: ON' : '🎨 4-Color Suits'}
+            <IconPalette size={14} />
+            <span>{fourColorDeck ? '4-Color: ON' : '4-Color'}</span>
           </button>
           <button
             type="button"
-            className="btn btn-ghost btn-xs hud-desktop-only"
+            className="btn btn-ghost btn-xs btn-icon-row hud-desktop-only"
             onClick={onToggleSound}
+            title={soundEnabled ? 'Mute sound effects' : 'Enable sound effects'}
           >
-            {soundEnabled ? '🔊 Sound' : '🔇 Muted'}
+            {soundEnabled ? <IconSoundOn size={14} /> : <IconSoundOff size={14} />}
+            <span>{soundEnabled ? 'Sound' : 'Muted'}</span>
           </button>
           <button
             type="button"
-            className="btn btn-ghost btn-xs"
+            className="btn btn-ghost btn-xs btn-icon-row"
             onClick={() => {
               setMenuOpen(false);
               setChatOpen((v) => !v);
             }}
+            title="Table chat"
           >
-            💬{chatMessages.length > 0 ? ` ${chatMessages.length}` : ''}
+            <IconChat size={14} />
+            {chatMessages.length > 0 && <span>{chatMessages.length}</span>}
           </button>
           <button
             type="button"
-            className="btn btn-ghost btn-xs hud-desktop-only"
+            className="btn btn-ghost btn-xs btn-icon-row hud-desktop-only"
             onClick={onOpenRules}
           >
-            Rules
+            <IconBook size={14} />
+            <span>Rules</span>
           </button>
           {role === 'host' && (
             <button
@@ -372,7 +431,7 @@ export const GameTable: React.FC<GameTableProps> = ({
           {/* Compact Mobile Menu Toggle */}
           <button
             type="button"
-            className="btn btn-secondary btn-xs hud-mobile-only"
+            className="btn btn-secondary btn-xs btn-icon-only hud-mobile-only"
             aria-label="Match menu"
             aria-expanded={menuOpen}
             onClick={() => {
@@ -380,7 +439,7 @@ export const GameTable: React.FC<GameTableProps> = ({
               setMenuOpen((v) => !v);
             }}
           >
-            {menuOpen ? '✕' : '☰'}
+            {menuOpen ? <IconClose size={15} /> : <IconMenu size={15} />}
           </button>
         </div>
 
@@ -394,23 +453,26 @@ export const GameTable: React.FC<GameTableProps> = ({
             <div className="mobile-menu-grid">
               <button
                 type="button"
-                className={`btn btn-sm ${fourColorDeck ? 'btn-gold' : 'btn-secondary'}`}
+                className={`btn btn-sm btn-icon-row ${fourColorDeck ? 'btn-gold' : 'btn-secondary'}`}
                 onClick={onToggleFourColorDeck}
               >
-                {fourColorDeck ? '🎨 4-Color: ON' : '🎨 4-Color Suits'}
+                <IconPalette size={14} />
+                <span>{fourColorDeck ? '4-Color: ON' : '4-Color Suits'}</span>
               </button>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={onToggleSound}>
-                {soundEnabled ? '🔊 Sound: ON' : '🔇 Muted'}
+              <button type="button" className="btn btn-secondary btn-sm btn-icon-row" onClick={onToggleSound}>
+                {soundEnabled ? <IconSoundOn size={14} /> : <IconSoundOff size={14} />}
+                <span>{soundEnabled ? 'Sound: ON' : 'Muted'}</span>
               </button>
               <button
                 type="button"
-                className="btn btn-secondary btn-sm"
+                className="btn btn-secondary btn-sm btn-icon-row"
                 onClick={() => {
                   setMenuOpen(false);
                   onOpenRules();
                 }}
               >
-                📖 Rules
+                <IconBook size={14} />
+                <span>Rules</span>
               </button>
               {role === 'host' && (
                 <button
@@ -421,7 +483,7 @@ export const GameTable: React.FC<GameTableProps> = ({
                     onReturnToLobby();
                   }}
                 >
-                  ↩ Back to Lobby
+                  Back to Lobby
                 </button>
               )}
               <button
@@ -446,21 +508,34 @@ export const GameTable: React.FC<GameTableProps> = ({
           <div className="mobile-opponents-row">
             {opponents.map(({ player, seatIdx }) => {
               const badge = getRoleBadge(seatIdx, player);
+              const isActing = activeTurnIndices.has(seatIdx);
+              const activeCls = isActing
+                ? seatIdx === game.defenderIndex
+                  ? 'seat-acting-def'
+                  : 'seat-acting-atk'
+                : '';
               return (
-                <div
-                  key={`m-${player.id}`}
-                  className={`mobile-opp-pill ${
-                    seatIdx === game.attackerIndex || seatIdx === game.defenderIndex
-                      ? 'seat-active'
-                      : ''
-                  }`}
-                >
+                <div key={`m-${player.id}`} className={`mobile-opp-pill ${activeCls}`}>
                   <div className="mobile-opp-line">
-                    <span>{player.type === 'bot' ? '🤖' : '👤'}</span>
+                    <span className="seat-type-icon">
+                      {player.type === 'bot' ? <IconBot size={13} /> : <IconUser size={13} />}
+                    </span>
                     <span className="mobile-opp-name">{player.name}</span>
+                    {isActing && player.type === 'bot' && (
+                      <span className="thinking-dots" aria-label="Thinking">
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                    )}
                     <span className="opponent-count">{player.cardCount}</span>
                   </div>
-                  {badge && <span className={`role-pill role-pill-xs ${badge.cls}`}>{badge.text}</span>}
+                  {badge && (
+                    <span className={`role-pill role-pill-xs ${badge.cls}`}>
+                      {badge.icon}
+                      <span>{badge.text}</span>
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -485,18 +560,22 @@ export const GameTable: React.FC<GameTableProps> = ({
         {/* Desktop Opponent seats */}
         {opponents.map(({ player, seatIdx, position }) => {
           const badge = getRoleBadge(seatIdx, player);
+          const isActing = activeTurnIndices.has(seatIdx);
+          const activeCls = isActing
+            ? seatIdx === game.defenderIndex
+              ? 'seat-acting-def'
+              : 'seat-acting-atk'
+            : '';
           const fanCount = Math.min(player.cardCount, 9);
           return (
             <div
               key={player.id}
-              className={`opponent-seat opponent-${position} ${
-                seatIdx === game.attackerIndex || seatIdx === game.defenderIndex
-                  ? 'seat-active'
-                  : ''
-              }`}
+              className={`opponent-seat opponent-${position} ${activeCls}`}
             >
               <div className="opponent-header">
-                <span className="opponent-icon">{player.type === 'bot' ? '🤖' : '👤'}</span>
+                <span className="opponent-icon">
+                  {player.type === 'bot' ? <IconBot size={15} /> : <IconUser size={15} />}
+                </span>
                 <span className="opponent-name">{player.name}</span>
                 {player.type === 'bot' && player.botDifficulty && (
                   <span className={`tag tag-bot tag-bot-${player.botDifficulty}`}>
@@ -505,7 +584,21 @@ export const GameTable: React.FC<GameTableProps> = ({
                 )}
                 <span className="opponent-count">{player.cardCount}</span>
               </div>
-              {badge && <div className={`role-pill ${badge.cls}`}>{badge.text}</div>}
+              <div className="opponent-role-row">
+                {badge && (
+                  <div className={`role-pill ${badge.cls}`}>
+                    {badge.icon}
+                    <span>{badge.text}</span>
+                  </div>
+                )}
+                {isActing && player.type === 'bot' && (
+                  <span className="thinking-dots" aria-label="Thinking">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                )}
+              </div>
               <div className="opponent-fan" aria-label={`${player.cardCount} cards`}>
                 {Array.from({ length: fanCount }).map((_, idx) => (
                   <PlayingCard
@@ -523,8 +616,9 @@ export const GameTable: React.FC<GameTableProps> = ({
           );
         })}
 
-        {/* Left Deck / Talon & Discard */}
+        {/* Left Deck / Talon */}
         <aside className="deck-zone">
+          <div className="zone-caption">Draw Pile</div>
           <div className="talon-wrap">
             {game.deckCount > 0 ? (
               <>
@@ -536,7 +630,15 @@ export const GameTable: React.FC<GameTableProps> = ({
                   title={`Trump card: ${game.trumpCard.rank} of ${game.trumpSuit}`}
                 />
                 {game.deckCount > 1 && (
-                  <div className="talon-stack">
+                  <div
+                    className={`talon-stack ${
+                      game.deckCount >= 14
+                        ? 'stack-thick'
+                        : game.deckCount >= 6
+                          ? 'stack-med'
+                          : 'stack-thin'
+                    }`}
+                  >
                     <PlayingCard faceDown size="sm" />
                     <span className="talon-count">{game.deckCount}</span>
                   </div>
@@ -552,10 +654,39 @@ export const GameTable: React.FC<GameTableProps> = ({
               </div>
             )}
           </div>
+        </aside>
 
-          <div className="discard-pill" title="Cards discarded after successful defenses">
-            <span>Discard</span>
-            <strong>{game.discardCount}</strong>
+        {/* Right Side (Desktop Symmetry): Visual Discard Pile + Recent Moves */}
+        <aside className="side-right-zone">
+          <div className="zone-caption">Discard ({game.discardCount})</div>
+          <div className="discard-visual" title={`${game.discardCount} cards discarded`}>
+            {game.discardCount > 0 ? (
+              <div className="discard-stack">
+                {game.discardCount >= 6 && (
+                  <PlayingCard faceDown size="sm" className="discard-ghost discard-ghost-2" />
+                )}
+                {game.discardCount >= 2 && (
+                  <PlayingCard faceDown size="sm" className="discard-ghost discard-ghost-1" />
+                )}
+                <PlayingCard faceDown size="sm" className="discard-top-card" />
+                <span className="discard-count-badge">{game.discardCount}</span>
+              </div>
+            ) : (
+              <div className="empty-discard-slot">
+                <span>None</span>
+              </div>
+            )}
+          </div>
+
+          <div className="mini-log-panel">
+            <div className="mini-log-title">Recent Plays</div>
+            <div className="mini-log-list">
+              {game.actionLog.slice(-4).map((entry) => (
+                <div key={entry.id} className="mini-log-entry">
+                  {entry.text}
+                </div>
+              ))}
+            </div>
           </div>
         </aside>
 
@@ -605,7 +736,15 @@ export const GameTable: React.FC<GameTableProps> = ({
         </section>
 
         {/* Bottom Player Dock */}
-        <section className="player-dock">
+        <section
+          className={`player-dock ${
+            myIndex !== -1 && activeTurnIndices.has(myIndex)
+              ? isDefender
+                ? 'dock-acting-def'
+                : 'dock-acting-atk'
+              : ''
+          }`}
+        >
           <div className="prompt-strip">
             <div className="prompt-text">{getTurnPrompt()}</div>
             <div className="action-buttons">
@@ -661,17 +800,21 @@ export const GameTable: React.FC<GameTableProps> = ({
               {me && (() => {
                 const badge = getRoleBadge(myIndex, me);
                 return badge ? (
-                  <span className={`role-pill ${badge.cls}`}>{badge.text}</span>
+                  <span className={`role-pill ${badge.cls}`}>
+                    {badge.icon}
+                    <span>{badge.text}</span>
+                  </span>
                 ) : null;
               })()}
             </div>
 
             <button
               type="button"
-              className="btn btn-ghost btn-xs"
+              className="btn btn-ghost btn-xs btn-icon-row"
               onClick={() => setSortMode((m) => (m === 'suit' ? 'rank' : 'suit'))}
             >
-              Sort: {sortMode === 'suit' ? 'By Suit' : 'By Rank'}
+              <IconSort size={13} />
+              <span>{sortMode === 'suit' ? 'By Suit' : 'By Rank'}</span>
             </button>
           </div>
 

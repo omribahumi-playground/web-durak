@@ -174,10 +174,13 @@ const CourtIcon: React.FC<{ rank: 11 | 12 | 13 }> = ({ rank }) => {
       <svg className="court-svg" viewBox="0 0 36 28" aria-hidden="true">
         <path
           d="M4 22 L2 8 L11 14 L18 4 L25 14 L34 8 L32 22 Z"
-          fill="currentColor"
-          opacity="0.9"
+          fill="#d9a536"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
         />
-        <rect x="4" y="23.5" width="28" height="3" rx="1.2" fill="currentColor" />
+        <circle cx="18" cy="4.2" r="1.8" fill="currentColor" />
+        <rect x="4" y="23.2" width="28" height="3" rx="1.2" fill="currentColor" />
       </svg>
     );
   }
@@ -186,13 +189,15 @@ const CourtIcon: React.FC<{ rank: 11 | 12 | 13 }> = ({ rank }) => {
       <svg className="court-svg" viewBox="0 0 36 28" aria-hidden="true">
         <path
           d="M5 22 L7 10 L13 15 L18 6 L23 15 L29 10 L31 22 Z"
-          fill="currentColor"
-          opacity="0.88"
+          fill="#e2b755"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
         />
-        <circle cx="18" cy="4.2" r="2.2" fill="currentColor" />
-        <circle cx="7" cy="8.2" r="1.7" fill="currentColor" />
-        <circle cx="29" cy="8.2" r="1.7" fill="currentColor" />
-        <rect x="5" y="23.5" width="26" height="2.8" rx="1.2" fill="currentColor" />
+        <circle cx="18" cy="4.2" r="2.1" fill="currentColor" />
+        <circle cx="7" cy="8.2" r="1.6" fill="currentColor" />
+        <circle cx="29" cy="8.2" r="1.6" fill="currentColor" />
+        <rect x="5" y="23.2" width="26" height="2.8" rx="1.2" fill="currentColor" />
       </svg>
     );
   }
@@ -200,12 +205,11 @@ const CourtIcon: React.FC<{ rank: 11 | 12 | 13 }> = ({ rank }) => {
     <svg className="court-svg" viewBox="0 0 32 32" aria-hidden="true">
       <path
         d="M16 3 L27 7.5 V15.5 C27 22.5 22 27 16 29.5 C10 27 5 22.5 5 15.5 V7.5 Z"
-        fill="currentColor"
-        opacity="0.22"
+        fill="rgba(217, 165, 54, 0.32)"
         stroke="currentColor"
-        strokeWidth="2.4"
+        strokeWidth="2.2"
       />
-      <path d="M16 7 V25 M9.5 14 H22.5" stroke="currentColor" strokeWidth="2.4" />
+      <path d="M16 7 V25 M9.5 14 H22.5" stroke="currentColor" strokeWidth="2.2" />
     </svg>
   );
 };

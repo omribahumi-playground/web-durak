@@ -9,6 +9,14 @@ import {
 } from '../game/types';
 import { PublicServerInfo } from '../net/publicServer';
 import { SignalingStatus } from '../net/webrtc';
+import {
+  IconBook,
+  IconBot,
+  IconMegaphone,
+  IconPalette,
+  IconQr,
+  IconUser,
+} from './Icons';
 import { QrCodeDisplay, QrScannerModal } from './QrCodeTools';
 
 interface LobbyViewProps {
@@ -165,14 +173,16 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
           </div>
           <button
             type="button"
-            className={`btn btn-sm ${fourColorDeck ? 'btn-gold' : 'btn-ghost'}`}
+            className={`btn btn-sm btn-icon-row ${fourColorDeck ? 'btn-gold' : 'btn-ghost'}`}
             onClick={onToggleFourColorDeck}
             title="Use distinct colors for all four suits (Spades Black, Hearts Red, Diamonds Blue, Clubs Green)"
           >
-            {fourColorDeck ? '🎨 4-Color Deck: ON' : '🎨 4-Color Deck'}
+            <IconPalette size={14} />
+            <span>{fourColorDeck ? '4-Color: ON' : '4-Color Deck'}</span>
           </button>
-          <button type="button" className="btn btn-ghost" onClick={onOpenRules}>
-            Rules
+          <button type="button" className="btn btn-ghost btn-icon-row" onClick={onOpenRules}>
+            <IconBook size={15} />
+            <span>Rules</span>
           </button>
           <button type="button" className="btn btn-danger-ghost" onClick={onLeave}>
             Leave
@@ -209,10 +219,11 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               {isHost && (
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  className="btn btn-secondary btn-icon-row"
                   onClick={() => setShowManual((v) => !v)}
                 >
-                  {showManual ? 'Hide Offline QR / P2P' : '📷 Offline QR / P2P'}
+                  <IconQr size={15} />
+                  <span>{showManual ? 'Hide Offline QR / P2P' : 'Offline QR / P2P'}</span>
                 </button>
               )}
             </div>
@@ -257,11 +268,12 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                       <label>2. Scan or paste your friend&apos;s Answer:</label>
                       <button
                         type="button"
-                        className="btn btn-gold btn-xs"
+                        className="btn btn-gold btn-xs btn-icon-row"
                         disabled={manualBusy}
                         onClick={() => setScanAnswerOpen(true)}
                       >
-                        📷 Scan Answer QR
+                        <IconQr size={13} />
+                        <span>Scan Answer QR</span>
                       </button>
                     </div>
                     <textarea
@@ -369,16 +381,19 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
                   <button
                     type="button"
-                    className="btn btn-primary btn-sm"
+                    className="btn btn-primary btn-sm btn-icon-row"
                     onClick={() => {
                       onPostInviteToServerChat();
                       setCopied('invite');
                       setTimeout(() => setCopied(null), 2200);
                     }}
                   >
-                    {copied === 'invite'
-                      ? `Posted to ${activeServer.name} Chat!`
-                      : `📣 Post Invite to ${activeServer.name} Chat`}
+                    <IconMegaphone size={14} />
+                    <span>
+                      {copied === 'invite'
+                        ? `Posted to ${activeServer.name} Chat!`
+                        : `Post Invite to ${activeServer.name} Chat`}
+                    </span>
                   </button>
                 </div>
               )}
@@ -413,7 +428,13 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                 return (
                   <div key={seat.seatIndex} className={`seat-row seat-${seat.kind}`}>
                     <div className="seat-avatar">
-                      {seat.kind === 'bot' ? '🤖' : seat.kind === 'open' ? '＋' : '👤'}
+                      {seat.kind === 'bot' ? (
+                        <IconBot size={18} />
+                      ) : seat.kind === 'open' ? (
+                        '+'
+                      ) : (
+                        <IconUser size={18} />
+                      )}
                     </div>
                     <div className="seat-info">
                       <div className="seat-name">
