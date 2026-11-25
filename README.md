@@ -15,7 +15,7 @@ A 100% static browser-based **Durak** card game supporting **2–4 players** wit
   - Choose **24 cards** (9–A), **36 cards** (6–A, standard), or **52 cards** (2–A).
   - **Classic (Throw-in)** and **Passing Mode** variants.
   - Optional 5-card first-bout cap (until first discard) and optional 4-player neighbors-only throw-in rule.
-  - 4 AI difficulty levels (**Easy**, **Normal**, **Hard**, **Extreme**), configurable globally or per bot seat.
+  - 5 AI difficulty levels (**Easy**, **Normal**, **Hard**, **Extreme**, **Master**—with card memory, Alpha-Beta 1v1 endgame solver, and Monte Carlo mid-game search), configurable globally or per bot seat.
 - **High-Visibility Cards**:
   - Bold custom SVG suit icons, traditional pip layouts (`2`–`10`), court emblems, and an optional **4-Color Suits** accessibility toggle.
 

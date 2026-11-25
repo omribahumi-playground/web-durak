@@ -376,6 +376,8 @@ export function createInitialGameState(
     trumpSuit,
     trumpCard,
     discardCount: 0,
+    discardedCards: [],
+    knownOpponentCards: Object.fromEntries(players.map((p) => [p.id, []])),
     hasHadDiscard: false,
     players,
     attackerIndex,
@@ -405,6 +407,28 @@ function getAttackersNeedingToPass(state: GameState): PlayerState[] {
     );
 }
 
+function cloneKnownCards(
+  known: Record<string, Card[]> | undefined,
+  players: PlayerState[],
+): Record<string, Card[]> {
+  const out: Record<string, Card[]> = {};
+  for (const p of players) {
+    out[p.id] = known?.[p.id] ? [...known[p.id]] : [];
+  }
+  return out;
+}
+
+function removeKnownCard(
+  known: Record<string, Card[]> | undefined,
+  players: PlayerState[],
+  playerId: string,
+  cardId: string,
+): Record<string, Card[]> {
+  const next = cloneKnownCards(known, players);
+  next[playerId] = (next[playerId] ?? []).filter((c) => c.id !== cardId);
+  return next;
+}
+
 function finishBout(
   state: GameState,
   outcome: 'discard' | 'took',
@@ -412,6 +436,8 @@ function finishBout(
   const players = state.players.map((p) => ({ ...p, hand: [...p.hand] }));
   const deck = [...state.deck];
   let discardCount = state.discardCount;
+  const discardedCards = [...(state.discardedCards ?? [])];
+  const knownOpponentCards = cloneKnownCards(state.knownOpponentCards, players);
   let hasHadDiscard = state.hasHadDiscard;
   let winnerIds = [...state.winnerIds];
   let nextFinishOrder = winnerIds.length + 1;
@@ -428,10 +454,19 @@ function finishBout(
   let summaryText = '';
   if (outcome === 'discard') {
     discardCount += tableCards.length;
+    discardedCards.push(...tableCards);
     hasHadDiscard = true;
     summaryText = `Defended! ${defender.name} cleared the table (${tableCards.length} cards discarded).`;
   } else {
     defender.hand.push(...tableCards);
+    // All cards picked up from the table are publicly visible to attentive players
+    const knownSet = new Set((knownOpponentCards[defender.id] ?? []).map((c) => c.id));
+    for (const c of tableCards) {
+      if (!knownSet.has(c.id)) {
+        knownOpponentCards[defender.id].push(c);
+        knownSet.add(c.id);
+      }
+    }
     summaryText = `${defender.name} picked up ${tableCards.length} cards.`;
   }
 
@@ -454,6 +489,13 @@ function finishBout(
       const drawn = deck.shift();
       if (drawn) {
         p.hand.push(drawn);
+        // The last card of the talon is the face-up trump card, so everyone sees who drew it!
+        if (deck.length === 0 && drawn.id === state.trumpCard.id) {
+          const already = knownOpponentCards[p.id].some((c) => c.id === drawn.id);
+          if (!already) {
+            knownOpponentCards[p.id].push(drawn);
+          }
+        }
       }
     }
     p.hand = sortHand(p.hand, state.trumpSuit, 'suit');
@@ -468,6 +510,7 @@ function finishBout(
         p.isOut = true;
         p.finishOrder = nextFinishOrder++;
         winnerIds.push(p.id);
+        knownOpponentCards[p.id] = [];
       }
     }
   }
@@ -485,6 +528,8 @@ function finishBout(
       subPhase: 'initial_attack',
       deck,
       discardCount,
+      discardedCards,
+      knownOpponentCards,
       hasHadDiscard,
       players,
       table: [],
@@ -514,6 +559,8 @@ function finishBout(
     subPhase: 'initial_attack',
     deck,
     discardCount,
+    discardedCards,
+    knownOpponentCards,
     hasHadDiscard,
     players,
     attackerIndex: nextAttackerIndex,
@@ -601,6 +648,7 @@ export function applyGameAction(
       ...state,
       subPhase: nextSubPhase,
       players,
+      knownOpponentCards: removeKnownCard(state.knownOpponentCards, players, player.id, card.id),
       table,
       passedPlayerIds: [],
       lastActionText: text,
@@ -650,6 +698,7 @@ export function applyGameAction(
     const updated: GameState = {
       ...state,
       players,
+      knownOpponentCards: removeKnownCard(state.knownOpponentCards, players, player.id, card.id),
       table,
       passedPlayerIds: [],
       lastActionText: text,
@@ -700,6 +749,7 @@ export function applyGameAction(
     const updated: GameState = {
       ...state,
       players,
+      knownOpponentCards: removeKnownCard(state.knownOpponentCards, players, player.id, card.id),
       attackerIndex: playerIndex,
       defenderIndex: nextDefenderIndex,
       defenderStartHandCount: players[nextDefenderIndex].hand.length,

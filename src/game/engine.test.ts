@@ -278,7 +278,66 @@ describe('Durak Engine', () => {
     expect(r2.state.players[1].hand.map((c) => c.id)).toEqual(['hearts-14']);
   });
 
-  it('completes full 4-bot games cleanly across all 4 AI difficulty levels, variants, and deck sizes', () => {
+  it('tracks public card memory (discards and picked-up cards) accurately', () => {
+    const base = createInitialGameState(
+      [
+        { id: 'p1', name: 'A', type: 'human' },
+        { id: 'p2', name: 'B', type: 'human' },
+      ],
+      { ...DEFAULT_SETTINGS, maxPlayers: 2 },
+      deterministicRng(5),
+    );
+    const custom: GameState = {
+      ...base,
+      trumpSuit: 'hearts',
+      attackerIndex: 0,
+      defenderIndex: 1,
+      defenderStartHandCount: 2,
+      deck: [],
+      discardedCards: [],
+      knownOpponentCards: { p1: [], p2: [] },
+      players: [
+        { ...base.players[0], hand: [makeCard('spades', 8), makeCard('clubs', 10)] },
+        { ...base.players[1], hand: [makeCard('clubs', 6), makeCard('diamonds', 7)] },
+      ],
+    };
+
+    const r1 = applyGameAction(custom, { type: 'attack', playerId: 'p1', cardId: 'spades-8' });
+    const r2 = applyGameAction(r1.state, { type: 'take', playerId: 'p2' });
+    const r3 = applyGameAction(r2.state, { type: 'pass_turn', playerId: 'p1' });
+    expect(r3.ok).toBe(true);
+    // P2 picked up 8♠ -> publicly known to be in P2's hand!
+    expect(r3.state.knownOpponentCards.p2.map((c) => c.id)).toContain('spades-8');
+  });
+
+  it('Master AI solves 1v1 endgames accurately and dominates Easy AI over a multi-game match', () => {
+    let masterWins = 0;
+    const totalGames = 6;
+    for (let g = 0; g < totalGames; g++) {
+      let state = createInitialGameState(
+        [
+          { id: 'm', name: 'Master Bot', type: 'bot', botDifficulty: 'master' },
+          { id: 'e', name: 'Easy Bot', type: 'bot', botDifficulty: 'easy' },
+        ],
+        { ...DEFAULT_SETTINGS, maxPlayers: 2, deckSize: 24 },
+        deterministicRng(500 + g * 17),
+      );
+      let steps = 0;
+      while (state.phase === 'playing' && steps < 400) {
+        const action = pickNextBotAction(state);
+        expect(action).not.toBeNull();
+        const res = applyGameAction(state, action!);
+        expect(res.ok).toBe(true);
+        state = res.state;
+        steps++;
+      }
+      expect(state.phase).toBe('finished');
+      if (state.durakId === 'e') masterWins += 1;
+    }
+    expect(masterWins).toBeGreaterThanOrEqual(4);
+  });
+
+  it('completes full 4-bot games cleanly across AI levels including Master, variants, and deck sizes', () => {
     const configs = [
       { variant: 'classic' as const, deckSize: 24 as const, seed: 101 },
       { variant: 'classic' as const, deckSize: 36 as const, seed: 102 },
@@ -291,8 +350,8 @@ describe('Durak Engine', () => {
         [
           { id: 'b1', name: 'Bot Easy', type: 'bot', botDifficulty: 'easy' },
           { id: 'b2', name: 'Bot Normal', type: 'bot', botDifficulty: 'normal' },
-          { id: 'b3', name: 'Bot Hard', type: 'bot', botDifficulty: 'hard' },
-          { id: 'b4', name: 'Bot Extreme', type: 'bot', botDifficulty: 'extreme' },
+          { id: 'b3', name: 'Bot Extreme', type: 'bot', botDifficulty: 'extreme' },
+          { id: 'b4', name: 'Bot Master', type: 'bot', botDifficulty: 'master' },
         ],
         { ...DEFAULT_SETTINGS, maxPlayers: 4, variant: cfg.variant, deckSize: cfg.deckSize },
         deterministicRng(cfg.seed),

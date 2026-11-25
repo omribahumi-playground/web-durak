@@ -10,6 +10,7 @@ import {
   getNextActivePlayerIndex,
   getTableRanks,
 } from './engine';
+import { pickMasterAction } from './masterAi';
 import { BotDifficulty, Card, GameAction, GameState, Suit } from './types';
 
 function cardValue(card: Card, trumpSuit: Suit, deckCount: number): number {
@@ -171,6 +172,9 @@ export function pickNextBotAction(state: GameState): GameAction | null {
       return null;
     }
     const diff = attacker.botDifficulty ?? state.settings.botDifficulty;
+    if (diff === 'master') {
+      return pickMasterAction(state, state.attackerIndex);
+    }
     return chooseOpeningAttack(state, state.attackerIndex, diff);
   }
 
@@ -184,6 +188,9 @@ export function pickNextBotAction(state: GameState): GameAction | null {
     const defender = state.players[state.defenderIndex];
     if (defender.type === 'bot' && !defender.isOut) {
       const diff = defender.botDifficulty ?? state.settings.botDifficulty;
+      if (diff === 'master') {
+        return pickMasterAction(state, state.defenderIndex);
+      }
       return chooseDefenseAction(state, state.defenderIndex, undefendedIndices, diff);
     }
   }
@@ -205,6 +212,11 @@ export function pickNextBotAction(state: GameState): GameAction | null {
     }
 
     const diff = player.botDifficulty ?? state.settings.botDifficulty;
+    if (diff === 'master') {
+      const masterAction = pickMasterAction(state, idx);
+      if (masterAction) return masterAction;
+      continue;
+    }
     const action = chooseThrowInOrPass(state, idx, diff);
     if (action) return action;
   }
@@ -215,7 +227,7 @@ export function pickNextBotAction(state: GameState): GameAction | null {
 function chooseOpeningAttack(
   state: GameState,
   playerIndex: number,
-  difficulty: BotDifficulty,
+  difficulty: Exclude<BotDifficulty, 'master'>,
 ): GameAction {
   const player = state.players[playerIndex];
   const deckCount = state.deck.length;
@@ -332,7 +344,7 @@ function chooseDefenseAction(
   state: GameState,
   defenderIndex: number,
   undefendedIndices: number[],
-  difficulty: BotDifficulty,
+  difficulty: Exclude<BotDifficulty, 'master'>,
 ): GameAction {
   const defender = state.players[defenderIndex];
   const deckCount = state.deck.length;
@@ -437,7 +449,7 @@ function chooseDefenseAction(
 function chooseThrowInOrPass(
   state: GameState,
   playerIndex: number,
-  difficulty: BotDifficulty,
+  difficulty: Exclude<BotDifficulty, 'master'>,
 ): GameAction | null {
   const player = state.players[playerIndex];
   const defender = state.players[state.defenderIndex];

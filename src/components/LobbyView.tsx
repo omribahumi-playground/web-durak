@@ -46,6 +46,7 @@ const DIFFICULTY_DESCRIPTIONS: Record<BotDifficulty, string> = {
   normal: 'Solid fundamentals: smart trump conservation, pair leads, and tactical takes.',
   hard: 'Optimal multi-card defense planning, rank-safe play, and strong endgame pressure.',
   extreme: 'Relentless card-tracking, tempo exploitation, and endgame lookahead.',
+  master: 'Full card memory, exact 1v1 Alpha-Beta endgame solver, and Monte Carlo mid-game search.',
 };
 
 export const LobbyView: React.FC<LobbyViewProps> = ({

@@ -9,16 +9,23 @@ export interface Card {
 }
 
 export type PlayerType = 'human' | 'bot';
-export type BotDifficulty = 'easy' | 'normal' | 'hard' | 'extreme';
+export type BotDifficulty = 'easy' | 'normal' | 'hard' | 'extreme' | 'master';
 export type GameVariant = 'classic' | 'passing';
 
-export const BOT_DIFFICULTIES: BotDifficulty[] = ['easy', 'normal', 'hard', 'extreme'];
+export const BOT_DIFFICULTIES: BotDifficulty[] = [
+  'easy',
+  'normal',
+  'hard',
+  'extreme',
+  'master',
+];
 
 export const BOT_DIFFICULTY_LABELS: Record<BotDifficulty, string> = {
   easy: 'Easy',
   normal: 'Normal',
   hard: 'Hard',
   extreme: 'Extreme',
+  master: 'Master',
 };
 
 export interface GameSettings {
@@ -77,6 +84,8 @@ export interface GameState {
   trumpSuit: Suit;
   trumpCard: Card;
   discardCount: number;
+  discardedCards: Card[];
+  knownOpponentCards: Record<string, Card[]>;
   hasHadDiscard: boolean;
   players: PlayerState[];
   attackerIndex: number;

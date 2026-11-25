@@ -643,6 +643,12 @@ textarea:focus {
   color: #ff9da3;
 }
 
+.tag-bot-master {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.34), rgba(224, 185, 99, 0.34));
+  border: 1px solid rgba(224, 185, 99, 0.48);
+  color: #ffe299;
+}
+
 .seat-controls {
   display: flex;
   align-items: center;
@@ -2552,8 +2558,8 @@ textarea:focus {
   }
 
   .segmented-control .seg-btn {
-    font-size: 0.76rem;
-    padding: 7px 4px;
+    font-size: 0.72rem;
+    padding: 7px 3px;
   }
 
   .custom-server-form {
