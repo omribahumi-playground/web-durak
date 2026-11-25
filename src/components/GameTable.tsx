@@ -59,6 +59,7 @@ export const GameTable: React.FC<GameTableProps> = ({
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<'suit' | 'rank'>('suit');
   const [chatOpen, setChatOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
 
   const myIndex = game.players.findIndex((p) => p.id === game.myPlayerId);
@@ -302,57 +303,186 @@ export const GameTable: React.FC<GameTableProps> = ({
       <header className="table-hud">
         <div className="hud-left">
           <span className="hud-brand">DURAK</span>
-          <span className="hud-chip">Room {roomCode}</span>
-          <span className="hud-chip">{game.settings.deckSize}-Card</span>
-          <span className="hud-chip">
+          <span className="hud-chip hud-desktop-only">Room {roomCode}</span>
+          <span className="hud-chip hud-desktop-only">{game.settings.deckSize}-Card</span>
+          <span className="hud-chip hud-desktop-only">
             {game.settings.variant === 'passing' ? 'Passing' : 'Classic'}
           </span>
-          <span className="hud-chip">Bout #{game.boutNumber}</span>
+          <span className="hud-chip hud-bout-chip">#{game.boutNumber}</span>
           <span className={`hud-chip hud-trump hud-suit-${game.trumpSuit}`}>
-            Trump: <SuitIcon suit={game.trumpSuit} className="hud-suit-svg" />{' '}
+            <span className="hud-desktop-only">Trump:</span>
+            <SuitIcon suit={game.trumpSuit} className="hud-suit-svg" />
             <strong>{SUIT_NAMES[game.trumpSuit]}</strong>
           </span>
         </div>
 
         <div className="hud-right">
           {role === 'guest' && rttMs !== null && (
-            <span className="hud-chip hud-rtc">P2P {rttMs}ms</span>
+            <span className="hud-chip hud-rtc hud-desktop-only">P2P {rttMs}ms</span>
           )}
           <button
             type="button"
-            className={`btn btn-xs ${fourColorDeck ? 'btn-gold' : 'btn-ghost'}`}
+            className={`btn btn-xs hud-desktop-only ${fourColorDeck ? 'btn-gold' : 'btn-ghost'}`}
             onClick={onToggleFourColorDeck}
             title="Use distinct colors for all four suits (Black Spades, Red Hearts, Blue Diamonds, Green Clubs)"
           >
             {fourColorDeck ? '🎨 4-Color: ON' : '🎨 4-Color Suits'}
           </button>
-          <button type="button" className="btn btn-ghost btn-xs" onClick={onToggleSound}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs hud-desktop-only"
+            onClick={onToggleSound}
+          >
             {soundEnabled ? '🔊 Sound' : '🔇 Muted'}
           </button>
           <button
             type="button"
             className="btn btn-ghost btn-xs"
-            onClick={() => setChatOpen((v) => !v)}
+            onClick={() => {
+              setMenuOpen(false);
+              setChatOpen((v) => !v);
+            }}
           >
-            💬 Chat{chatMessages.length > 0 ? ` (${chatMessages.length})` : ''}
+            💬{chatMessages.length > 0 ? ` ${chatMessages.length}` : ''}
           </button>
-          <button type="button" className="btn btn-ghost btn-xs" onClick={onOpenRules}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs hud-desktop-only"
+            onClick={onOpenRules}
+          >
             Rules
           </button>
           {role === 'host' && (
-            <button type="button" className="btn btn-ghost btn-xs" onClick={onReturnToLobby}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs hud-desktop-only"
+              onClick={onReturnToLobby}
+            >
               Lobby
             </button>
           )}
-          <button type="button" className="btn btn-danger-ghost btn-xs" onClick={onLeave}>
+          <button
+            type="button"
+            className="btn btn-danger-ghost btn-xs hud-desktop-only"
+            onClick={onLeave}
+          >
             Leave
           </button>
+
+          {/* Compact Mobile Menu Toggle */}
+          <button
+            type="button"
+            className="btn btn-secondary btn-xs hud-mobile-only"
+            aria-label="Match menu"
+            aria-expanded={menuOpen}
+            onClick={() => {
+              setChatOpen(false);
+              setMenuOpen((v) => !v);
+            }}
+          >
+            {menuOpen ? '✕' : '☰'}
+          </button>
         </div>
+
+        {menuOpen && (
+          <div className="mobile-hud-menu hud-mobile-only">
+            <div className="mobile-menu-meta">
+              <span>Room <strong>{roomCode}</strong></span>
+              <span>· {game.settings.deckSize}-Card {game.settings.variant === 'passing' ? 'Passing' : 'Classic'}</span>
+              {role === 'guest' && rttMs !== null && <span>· P2P {rttMs}ms</span>}
+            </div>
+            <div className="mobile-menu-grid">
+              <button
+                type="button"
+                className={`btn btn-sm ${fourColorDeck ? 'btn-gold' : 'btn-secondary'}`}
+                onClick={onToggleFourColorDeck}
+              >
+                {fourColorDeck ? '🎨 4-Color: ON' : '🎨 4-Color Suits'}
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={onToggleSound}>
+                {soundEnabled ? '🔊 Sound: ON' : '🔇 Muted'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onOpenRules();
+                }}
+              >
+                📖 Rules
+              </button>
+              {role === 'host' && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onReturnToLobby();
+                  }}
+                >
+                  ↩ Back to Lobby
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-danger-ghost btn-sm"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onLeave();
+                }}
+              >
+                Leave Match
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main Felt Arena */}
       <main className={`felt-board players-${game.players.length}`}>
-        {/* Opponent seats */}
+        {/* Compact mobile-only opponents + deck top bar (hidden on desktop) */}
+        <div className="mobile-top-strip">
+          <div className="mobile-opponents-row">
+            {opponents.map(({ player, seatIdx }) => {
+              const badge = getRoleBadge(seatIdx, player);
+              return (
+                <div
+                  key={`m-${player.id}`}
+                  className={`mobile-opp-pill ${
+                    seatIdx === game.attackerIndex || seatIdx === game.defenderIndex
+                      ? 'seat-active'
+                      : ''
+                  }`}
+                >
+                  <div className="mobile-opp-line">
+                    <span>{player.type === 'bot' ? '🤖' : '👤'}</span>
+                    <span className="mobile-opp-name">{player.name}</span>
+                    <span className="opponent-count">{player.cardCount}</span>
+                  </div>
+                  {badge && <span className={`role-pill role-pill-xs ${badge.cls}`}>{badge.text}</span>}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mobile-deck-strip">
+            <span className="mobile-deck-pill">
+              Deck: <strong>{game.deckCount}</strong>
+            </span>
+            {game.deckCount > 0 && (
+              <span className={`mobile-deck-pill mobile-trump-mini hud-suit-${game.trumpSuit}`}>
+                <SuitIcon suit={game.trumpSuit} className="mobile-mini-suit-svg" />
+                <strong>{game.trumpCard.rank <= 10 ? game.trumpCard.rank : ['J', 'Q', 'K', 'A'][game.trumpCard.rank - 11]}</strong>
+              </span>
+            )}
+            <span className="mobile-deck-pill">
+              Discard: <strong>{game.discardCount}</strong>
+            </span>
+          </div>
+        </div>
+
+        {/* Desktop Opponent seats */}
         {opponents.map(({ player, seatIdx, position }) => {
           const badge = getRoleBadge(seatIdx, player);
           const fanCount = Math.min(player.cardCount, 9);

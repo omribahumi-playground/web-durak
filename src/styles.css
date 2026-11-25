@@ -34,6 +34,9 @@ body,
 
 .app-root {
   min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 100vw;
+  overflow-x: clip;
   display: flex;
   flex-direction: column;
 }
@@ -256,7 +259,7 @@ textarea:focus {
 
 .home-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 20px;
 }
 
@@ -1549,9 +1552,11 @@ textarea:focus {
   box-shadow: 0 8px 20px rgba(224, 185, 99, 0.35), 0 0 0 2px rgba(224, 185, 99, 0.65);
 }
 
-.card-playable:hover {
-  transform: translateY(-12px) scale(1.03);
-  z-index: 10;
+@media (hover: hover) {
+  .card-playable:hover {
+    transform: translateY(-12px) scale(1.03);
+    z-index: 10;
+  }
 }
 
 .card-selected {
@@ -2084,4 +2089,489 @@ textarea:focus {
 .full-select {
   width: 100%;
   padding: 9px 10px;
+}
+
+/* ---------- Mobile Ergonomics & Zero-Overflow Responsive Polish ---------- */
+.hud-mobile-only,
+.mobile-top-strip {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* HUD collapses to 1 compact bar + dropdown menu */
+  .hud-desktop-only {
+    display: none !important;
+  }
+
+  .hud-mobile-only {
+    display: inline-flex;
+  }
+
+  .table-hud {
+    position: relative;
+    padding: 8px 10px;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .hud-left,
+  .hud-right {
+    flex-wrap: nowrap;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .hud-brand {
+    font-size: 0.95rem;
+    letter-spacing: 0.1em;
+    margin-right: 0;
+  }
+
+  .hud-bout-chip {
+    padding: 3px 7px;
+    font-size: 0.74rem;
+  }
+
+  .hud-trump {
+    padding: 3px 8px;
+    font-size: 0.76rem;
+    gap: 4px;
+  }
+
+  .hud-suit-svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .mobile-hud-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: absolute;
+    top: calc(100% + 1px);
+    left: 0;
+    right: 0;
+    z-index: 140;
+    padding: 12px;
+    background: rgba(8, 22, 18, 0.98);
+    border-bottom: 1px solid var(--panel-border);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.6);
+  }
+
+  .mobile-menu-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .mobile-menu-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  /* Viewport-fit Game Table (no page scroll!) */
+  .table-shell {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .felt-board {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    gap: 8px;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  /* Hide desktop opponent seats & side talon; show compact top strip */
+  .opponent-seat,
+  .deck-zone {
+    display: none;
+  }
+
+  .mobile-top-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .mobile-opponents-row {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .mobile-opp-pill {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 6px;
+    border-radius: 10px;
+    background: rgba(7, 20, 16, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+  }
+
+  .mobile-opp-line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    font-size: 0.76rem;
+    font-weight: 600;
+  }
+
+  .mobile-opp-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .role-pill-xs {
+    font-size: 0.64rem;
+    padding: 2px 6px;
+  }
+
+  .mobile-deck-strip {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .mobile-deck-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    background: rgba(0, 0, 0, 0.34);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: var(--muted);
+  }
+
+  .mobile-deck-pill strong {
+    color: var(--text);
+  }
+
+  .mobile-trump-mini {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: var(--gold);
+  }
+
+  .mobile-trump-mini strong {
+    color: inherit;
+  }
+
+  .mobile-mini-suit-svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Compact Battle Arena fits 6 pairs cleanly */
+  .battle-arena {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px 8px;
+    gap: 8px;
+    border-radius: 16px;
+    justify-content: center;
+  }
+
+  .table-pairs {
+    gap: 10px 14px;
+  }
+
+  .table-pair {
+    width: 72px;
+    height: 102px;
+  }
+
+  .defense-overlay {
+    top: 11px;
+    left: 11px;
+    transform: rotate(5deg);
+  }
+
+  .card-md {
+    width: 60px;
+    height: 88px;
+    border-radius: 7px;
+  }
+
+  .card-md .card-corner {
+    top: 2px;
+    left: 2px;
+    min-width: 18px;
+    padding: 1px;
+    gap: 1px;
+  }
+
+  .card-md .card-corner-br {
+    top: auto;
+    left: auto;
+    bottom: 2px;
+    right: 2px;
+  }
+
+  .card-md .card-rank {
+    font-size: 0.88rem;
+  }
+
+  .card-md .card-corner-suit-svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .card-md .card-pips {
+    top: 15%;
+    bottom: 15%;
+    left: 27%;
+    right: 27%;
+  }
+
+  .card-md .card-pip-svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .card-md .card-pips-dense .card-pip-svg {
+    width: 9.5px;
+    height: 9.5px;
+  }
+
+  .card-md .card-ace-svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .card-md .court-svg {
+    width: 16px;
+    height: 14px;
+  }
+
+  .card-md .court-letter {
+    font-size: 0.9rem;
+  }
+
+  .card-md .court-mini-svg {
+    width: 9px;
+    height: 9px;
+  }
+
+  .arena-meta {
+    font-size: 0.72rem;
+    gap: 8px;
+    text-align: center;
+  }
+
+  /* Bottom Player Dock: compact + single-row overlapping swipeable hand! */
+  .player-dock {
+    flex-shrink: 0;
+    padding: 8px 10px 6px;
+    gap: 6px;
+    border-radius: 14px;
+  }
+
+  .prompt-strip {
+    gap: 6px;
+  }
+
+  .prompt-text {
+    font-size: 0.8rem;
+    line-height: 1.25;
+  }
+
+  .my-info-bar {
+    font-size: 0.78rem;
+  }
+
+  .hand-tray {
+    flex-wrap: nowrap;
+    justify-content: safe center;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0;
+    min-height: 130px;
+    padding: 20px 10px 6px;
+  }
+
+  .hand-tray::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hand-card {
+    margin-left: -18px;
+  }
+
+  .hand-card:first-child {
+    margin-left: 0;
+  }
+
+  .card-lg {
+    width: 72px;
+    height: 104px;
+    border-radius: 8px;
+  }
+
+  .card-lg .card-corner {
+    top: 3px;
+    left: 3px;
+    min-width: 20px;
+    padding: 1px 2px;
+    gap: 1px;
+  }
+
+  .card-lg .card-corner-br {
+    top: auto;
+    left: auto;
+    bottom: 3px;
+    right: 3px;
+  }
+
+  .card-lg .card-rank {
+    font-size: 1rem;
+  }
+
+  .card-lg .card-corner-suit-svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .card-lg .card-pips {
+    top: 15%;
+    bottom: 15%;
+    left: 28%;
+    right: 28%;
+  }
+
+  .card-lg .card-pip-svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .card-lg .card-pips-dense .card-pip-svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .card-lg .card-ace-svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .card-lg .court-svg {
+    width: 20px;
+    height: 17px;
+  }
+
+  .card-lg .court-letter {
+    font-size: 1.05rem;
+  }
+
+  .card-lg .court-mini-svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  .card-selected {
+    transform: translateY(-14px) scale(1.04) !important;
+  }
+
+  /* Home, Lobby & Public Servers mobile spacing & anti-overflow */
+  .home-shell,
+  .lobby-shell,
+  .server-shell {
+    padding: 16px 12px 28px;
+    gap: 14px;
+  }
+
+  .panel {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .name-bar {
+    width: 100%;
+  }
+
+  .name-bar input {
+    flex: 1;
+    min-width: 120px;
+    width: auto;
+  }
+
+  .public-banner-info {
+    min-width: 0;
+  }
+
+  .public-banner-cta {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .public-banner-stats {
+    justify-content: center;
+  }
+
+  .home-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .room-code-value {
+    font-size: 1.6rem;
+    letter-spacing: 0.14em;
+  }
+
+  .seat-row {
+    flex-wrap: wrap;
+    padding: 10px 12px;
+  }
+
+  .seat-controls {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .segmented-control .seg-btn {
+    font-size: 0.76rem;
+    padding: 7px 4px;
+  }
+
+  .custom-server-form {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .public-table-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .chat-drawer {
+    left: 10px;
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    width: auto;
+    max-width: none;
+  }
 }
