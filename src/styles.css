@@ -2144,38 +2144,38 @@ textarea:focus {
 
   .table-hud {
     position: relative;
-    padding: 8px 10px;
+    padding: 6px 8px;
     flex-wrap: nowrap;
-    gap: 6px;
+    gap: 5px;
   }
 
   .hud-left,
   .hud-right {
     flex-wrap: nowrap;
-    gap: 6px;
+    gap: 5px;
     min-width: 0;
   }
 
   .hud-brand {
-    font-size: 0.95rem;
-    letter-spacing: 0.1em;
+    font-size: 0.9rem;
+    letter-spacing: 0.08em;
     margin-right: 0;
   }
 
   .hud-bout-chip {
-    padding: 3px 7px;
-    font-size: 0.74rem;
+    padding: 2px 6px;
+    font-size: 0.7rem;
   }
 
   .hud-trump {
-    padding: 3px 8px;
-    font-size: 0.76rem;
+    padding: 2px 7px;
+    font-size: 0.72rem;
     gap: 4px;
   }
 
   .hud-suit-svg {
-    width: 14px;
-    height: 14px;
+    width: 13px;
+    height: 13px;
   }
 
   .mobile-hud-menu {
@@ -2219,8 +2219,8 @@ textarea:focus {
     flex-direction: column;
     flex: 1;
     min-height: 0;
-    gap: 8px;
-    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    gap: 5px;
+    padding: 5px 6px calc(5px + env(safe-area-inset-bottom));
     max-width: 100%;
     overflow: hidden;
   }
@@ -2235,13 +2235,13 @@ textarea:focus {
   .mobile-top-strip {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     flex-shrink: 0;
   }
 
   .mobile-opponents-row {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     width: 100%;
   }
 
@@ -2251,20 +2251,26 @@ textarea:focus {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
-    padding: 6px 6px;
-    border-radius: 10px;
-    background: rgba(7, 20, 16, 0.72);
+    gap: 2px;
+    padding: 4px 4px;
+    border-radius: 9px;
+    background: rgba(7, 20, 16, 0.76);
     border: 1px solid rgba(255, 255, 255, 0.14);
   }
 
   .mobile-opp-line {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
     max-width: 100%;
-    font-size: 0.76rem;
+    font-size: 0.7rem;
     font-weight: 600;
+  }
+
+  .mobile-opp-line .opponent-count {
+    font-size: 0.66rem;
+    padding: 0 5px;
+    flex-shrink: 0;
   }
 
   .mobile-opp-name {
@@ -2274,25 +2280,63 @@ textarea:focus {
   }
 
   .role-pill-xs {
-    font-size: 0.64rem;
-    padding: 2px 6px;
+    font-size: 0.6rem;
+    padding: 1px 5px;
+    gap: 3px;
+  }
+
+  .mobile-revealed-chips {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    gap: 2px;
+    scrollbar-width: none;
+    padding-top: 1px;
+  }
+
+  .mobile-revealed-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mini-card-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    background: #ffffff;
+    border-radius: 3px;
+    padding: 0 3px;
+    font-size: 0.62rem;
+    font-weight: 800;
+    line-height: 1.3;
+    flex-shrink: 0;
+  }
+
+  .mini-chip-trump {
+    background: #fbf0cf;
+    box-shadow: inset 0 0 0 1px #d4a130;
+  }
+
+  .mini-chip-suit {
+    width: 8px;
+    height: 8px;
   }
 
   .mobile-deck-strip {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
+    gap: 5px;
+    flex-wrap: nowrap;
   }
 
   .mobile-deck-pill {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 3px 9px;
+    gap: 3px;
+    padding: 2px 7px;
     border-radius: 999px;
-    font-size: 0.74rem;
+    font-size: 0.68rem;
     background: rgba(0, 0, 0, 0.34);
     border: 1px solid rgba(255, 255, 255, 0.14);
     color: var(--muted);
@@ -2312,47 +2356,51 @@ textarea:focus {
   }
 
   .mobile-mini-suit-svg {
-    width: 12px;
-    height: 12px;
+    width: 11px;
+    height: 11px;
   }
 
-  /* Compact Battle Arena fits 6 pairs cleanly */
+  /* Compact Battle Arena fits all 6 pairs cleanly without vertical overflow or top-clipping */
   .battle-arena {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 10px 8px;
-    gap: 8px;
-    border-radius: 16px;
-    justify-content: center;
+    padding: 6px 6px;
+    gap: 5px;
+    border-radius: 14px;
+    justify-content: safe center;
+  }
+
+  .empty-arena-hint {
+    transform: scale(0.82);
   }
 
   .table-pairs {
-    gap: 10px 14px;
+    gap: 8px 10px;
   }
 
   .table-pair {
-    width: 72px;
-    height: 102px;
+    width: 62px;
+    height: 86px;
   }
 
   .defense-overlay {
-    top: 11px;
-    left: 11px;
+    top: 9px;
+    left: 9px;
     transform: rotate(5deg);
   }
 
   .card-md {
-    width: 60px;
-    height: 88px;
-    border-radius: 7px;
+    width: 52px;
+    height: 76px;
+    border-radius: 6px;
   }
 
   .card-md .card-corner {
     top: 2px;
     left: 2px;
-    min-width: 18px;
-    padding: 1px;
+    min-width: 15px;
+    padding: 0;
     gap: 1px;
   }
 
@@ -2364,12 +2412,18 @@ textarea:focus {
   }
 
   .card-md .card-rank {
-    font-size: 0.88rem;
+    font-size: 0.78rem;
   }
 
   .card-md .card-corner-suit-svg {
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
+  }
+
+  .card-md .card-trump-pip {
+    width: 13px;
+    height: 13px;
+    font-size: 0.46rem;
   }
 
   .card-md .card-pips {
@@ -2380,59 +2434,77 @@ textarea:focus {
   }
 
   .card-md .card-pip-svg {
-    width: 11px;
-    height: 11px;
-  }
-
-  .card-md .card-pips-dense .card-pip-svg {
     width: 9.5px;
     height: 9.5px;
   }
 
+  .card-md .card-pips-dense .card-pip-svg {
+    width: 8px;
+    height: 8px;
+  }
+
   .card-md .card-ace-svg {
-    width: 24px;
-    height: 24px;
+    width: 21px;
+    height: 21px;
   }
 
   .card-md .court-svg {
-    width: 16px;
-    height: 14px;
+    width: 14px;
+    height: 12px;
   }
 
   .card-md .court-letter {
-    font-size: 0.9rem;
+    font-size: 0.78rem;
   }
 
   .card-md .court-mini-svg {
-    width: 9px;
-    height: 9px;
+    width: 8px;
+    height: 8px;
   }
 
   .arena-meta {
-    font-size: 0.72rem;
-    gap: 8px;
+    font-size: 0.68rem;
+    gap: 6px;
     text-align: center;
   }
 
-  /* Bottom Player Dock: compact + single-row overlapping swipeable hand! */
+  .arena-last-text {
+    display: none;
+  }
+
+  /* Bottom Player Dock: ultra-compact + single-row overlapping swipeable hand! */
   .player-dock {
     flex-shrink: 0;
-    padding: 8px 10px 6px;
-    gap: 6px;
-    border-radius: 14px;
+    padding: 6px 8px 4px;
+    gap: 4px;
+    border-radius: 12px;
   }
 
   .prompt-strip {
-    gap: 6px;
+    gap: 4px 6px;
   }
 
   .prompt-text {
-    font-size: 0.8rem;
-    line-height: 1.25;
+    font-size: 0.75rem;
+    line-height: 1.2;
+  }
+
+  .action-buttons {
+    gap: 5px;
+  }
+
+  .action-buttons .btn {
+    padding: 5px 9px;
+    font-size: 0.74rem;
   }
 
   .my-info-bar {
-    font-size: 0.78rem;
+    font-size: 0.72rem;
+  }
+
+  .my-identity {
+    gap: 5px;
+    font-size: 0.74rem;
   }
 
   .hand-tray {
@@ -2443,8 +2515,8 @@ textarea:focus {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     gap: 0;
-    min-height: 130px;
-    padding: 20px 10px 6px;
+    min-height: 108px;
+    padding: 14px 8px 2px;
   }
 
   .hand-tray::-webkit-scrollbar {
@@ -2452,7 +2524,7 @@ textarea:focus {
   }
 
   .hand-card {
-    margin-left: -18px;
+    margin-left: -16px;
   }
 
   .hand-card:first-child {
@@ -2460,33 +2532,39 @@ textarea:focus {
   }
 
   .card-lg {
-    width: 72px;
-    height: 104px;
-    border-radius: 8px;
+    width: 64px;
+    height: 92px;
+    border-radius: 7px;
   }
 
   .card-lg .card-corner {
-    top: 3px;
-    left: 3px;
-    min-width: 20px;
-    padding: 1px 2px;
+    top: 2px;
+    left: 2px;
+    min-width: 18px;
+    padding: 1px;
     gap: 1px;
   }
 
   .card-lg .card-corner-br {
     top: auto;
     left: auto;
-    bottom: 3px;
-    right: 3px;
+    bottom: 2px;
+    right: 2px;
   }
 
   .card-lg .card-rank {
-    font-size: 1rem;
+    font-size: 0.92rem;
   }
 
   .card-lg .card-corner-suit-svg {
-    width: 14px;
-    height: 14px;
+    width: 13px;
+    height: 13px;
+  }
+
+  .card-lg .card-trump-pip {
+    width: 15px;
+    height: 15px;
+    font-size: 0.52rem;
   }
 
   .card-lg .card-pips {
@@ -2497,36 +2575,40 @@ textarea:focus {
   }
 
   .card-lg .card-pip-svg {
-    width: 13px;
-    height: 13px;
+    width: 11.5px;
+    height: 11.5px;
   }
 
   .card-lg .card-pips-dense .card-pip-svg {
-    width: 11px;
-    height: 11px;
+    width: 9.5px;
+    height: 9.5px;
   }
 
   .card-lg .card-ace-svg {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
   }
 
   .card-lg .court-svg {
-    width: 20px;
-    height: 17px;
+    width: 17px;
+    height: 15px;
   }
 
   .card-lg .court-letter {
-    font-size: 1.05rem;
+    font-size: 0.94rem;
   }
 
   .card-lg .court-mini-svg {
-    width: 10px;
-    height: 10px;
+    width: 9px;
+    height: 9px;
+  }
+
+  .card-playable {
+    transform: translateY(-4px);
   }
 
   .card-selected {
-    transform: translateY(-14px) scale(1.04) !important;
+    transform: translateY(-10px) scale(1.03) !important;
   }
 
   /* Home, Lobby & Public Servers mobile spacing & anti-overflow */

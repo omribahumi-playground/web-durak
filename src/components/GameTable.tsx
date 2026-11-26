@@ -562,6 +562,21 @@ export const GameTable: React.FC<GameTableProps> = ({
                       <span>{badge.text}</span>
                     </span>
                   )}
+                  {isSpectator && showAllHands && game.revealedHands?.[player.id] && (
+                    <div className="mobile-revealed-chips" aria-label={`${player.name}'s cards`}>
+                      {sortHand(game.revealedHands[player.id], game.trumpSuit, 'suit').map((c) => (
+                        <span
+                          key={c.id}
+                          className={`mini-card-chip hud-suit-${c.suit} ${
+                            c.suit === game.trumpSuit ? 'mini-chip-trump' : ''
+                          }`}
+                        >
+                          {c.rank <= 10 ? c.rank : ['J', 'Q', 'K', 'A'][c.rank - 11]}
+                          <SuitIcon suit={c.suit} className="mini-chip-suit" />
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -768,7 +783,7 @@ export const GameTable: React.FC<GameTableProps> = ({
           )}
 
           <div className="arena-meta">
-            <span>{game.lastActionText}</span>
+            <span className="arena-last-text">{game.lastActionText}</span>
             <span className="arena-cap">
               Table {game.table.length}/{maxAttacks}
             </span>
