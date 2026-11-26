@@ -72,7 +72,7 @@ export const PublicServerView: React.FC<PublicServerViewProps> = ({
       {/* Header */}
       <header className="lobby-header">
         <div>
-          <span className="eyebrow">Zero-Backend Public Directory</span>
+          <span className="eyebrow">Public Halls</span>
           <h1>
             {activeServer.icon} {activeServer.name}
           </h1>
@@ -84,14 +84,14 @@ export const PublicServerView: React.FC<PublicServerViewProps> = ({
             className={`status-pill status-${
               status === 'connected' ? 'connected' : status === 'connecting' ? 'connecting' : 'offline'
             }`}
-            title={`Connected via ${brokerLabel || 'Public Relay'}`}
+            title={brokerLabel ? `Status: ${brokerLabel}` : 'Connection status'}
           >
             <span className="status-dot" />
             {status === 'connected'
               ? `Live · ${onlinePlayers.length} Online`
               : status === 'connecting'
-                ? 'Connecting to Public Relay...'
-                : `Local Tab Mode · ${onlinePlayers.length} Online`}
+                ? 'Connecting...'
+                : `Offline · ${onlinePlayers.length} Online`}
           </div>
           <button type="button" className="btn btn-ghost" onClick={onOpenRules}>
             Rules
@@ -125,9 +125,9 @@ export const PublicServerView: React.FC<PublicServerViewProps> = ({
             type="text"
             value={customInput}
             onChange={(e) => setCustomInput(e.target.value)}
-            placeholder="Custom server (e.g. friday-club)"
+            placeholder="Custom hall (e.g. friday-club)"
             maxLength={32}
-            aria-label="Custom server name"
+            aria-label="Custom hall name"
           />
           <button type="submit" className="btn btn-secondary btn-sm" disabled={!customInput.trim()}>
             Go
@@ -143,7 +143,7 @@ export const PublicServerView: React.FC<PublicServerViewProps> = ({
             <div>
               <h2>Public Tables ({filteredTables.length})</h2>
               <p className="muted-small">
-                Click any open table to connect directly via WebRTC DataChannels.
+                Click any open table to join right away.
               </p>
             </div>
 

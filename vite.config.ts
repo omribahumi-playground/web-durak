@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'DURAK — WebRTC Card Game',
+        name: 'DURAK — Card Game',
         short_name: 'DURAK',
-        description: 'Offline-capable WebRTC multiplayer & AI Durak card game for 2–4 players.',
+        description: 'Play Durak with friends online, offline on local Wi-Fi, or against computer players (2–4 players).',
         start_url: './',
         scope: './',
         display: 'standalone',

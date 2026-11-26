@@ -204,7 +204,7 @@ export class HostNetworkManager {
       this.peer = null;
     }
 
-    this.callbacks.onSignalingStatus('connecting', 'Opening zero-backend WebRTC room...');
+    this.callbacks.onSignalingStatus('connecting', 'Opening room...');
     try {
       const peer = new Peer(roomCodeToPeerId(this.roomCode), {
         debug: 0,
@@ -220,7 +220,7 @@ export class HostNetworkManager {
         this.collisionRetries = 0;
         this.callbacks.onSignalingStatus(
           'connected',
-          'WebRTC P2P room live — share the code with friends!',
+          'Room is live — share the code with friends!',
         );
       });
 
@@ -234,13 +234,13 @@ export class HostNetworkManager {
 
       peer.on('disconnected', () => {
         if (!this.disposed && !peer.destroyed) {
-          this.callbacks.onSignalingStatus('connecting', 'Reconnecting to P2P broker...');
+          this.callbacks.onSignalingStatus('connecting', 'Reconnecting...');
           try {
             peer.reconnect();
           } catch {
             this.callbacks.onSignalingStatus(
               'offline',
-              'Broker disconnected — active peers, bots, and Direct P2P codes still work.',
+              'Offline mode — computer players and QR pairing still work.',
             );
           }
         }
@@ -257,13 +257,13 @@ export class HostNetworkManager {
         }
         this.callbacks.onSignalingStatus(
           'offline',
-          'Public P2P broker unreachable — bots and Direct P2P Invite Codes still work.',
+          'Offline mode — computer players and QR pairing still work.',
         );
       });
     } catch {
       this.callbacks.onSignalingStatus(
         'offline',
-        'WebRTC broker unavailable — bots and Direct P2P Invite Codes still work.',
+        'Offline mode — computer players and QR pairing still work.',
       );
     }
   }
@@ -385,7 +385,7 @@ export class HostNetworkManager {
   public async acceptManualAnswer(peerId: string, answerCode: string): Promise<void> {
     const rec = this.peers.get(peerId);
     if (!rec || rec.kind !== 'manual') {
-      throw new Error('No pending direct invite found for that peer.');
+      throw new Error('No pending invite found. Please generate a new QR code.');
     }
     const payload = decodeSignalBlob<{
       sdp?: RTCSessionDescriptionInit;
@@ -398,7 +398,7 @@ export class HostNetworkManager {
         ? { type: payload.t, sdp: payload.s }
         : null;
     if (!sdpDesc || sdpDesc.type !== 'answer') {
-      throw new Error('Invalid answer code.');
+      throw new Error('Invalid reply code.');
     }
     await rec.pc.setRemoteDescription(new RTCSessionDescription(sdpDesc));
   }
@@ -478,7 +478,7 @@ export class ClientNetworkManager {
 
   public joinRoom(roomCode: string): void {
     const cleanCode = roomCode.trim().toUpperCase();
-    this.callbacks.onStatusChange('connecting', `Connecting to room ${cleanCode} via WebRTC...`);
+    this.callbacks.onStatusChange('connecting', `Joining room ${cleanCode}...`);
 
     try {
       const peer = new Peer({
@@ -491,7 +491,7 @@ export class ClientNetworkManager {
         if (!this.disposed && (!this.conn || !this.conn.open)) {
           this.callbacks.onStatusChange(
             'error',
-            `Could not reach room "${cleanCode}". Check the code or try a Direct P2P Invite Code.`,
+            `Could not reach room "${cleanCode}". Double-check the code or try Offline QR Pairing.`,
           );
         }
       }, 12000);
@@ -538,7 +538,7 @@ export class ClientNetworkManager {
         conn.on('error', () => {
           this.clearConnectTimeout();
           if (!this.disposed) {
-            this.callbacks.onStatusChange('error', 'WebRTC connection failed.');
+            this.callbacks.onStatusChange('error', 'Could not connect to the room.');
           }
         });
       });
@@ -555,11 +555,11 @@ export class ClientNetworkManager {
         }
         this.callbacks.onStatusChange(
           'error',
-          'Could not connect to public P2P broker. Use a Direct P2P Invite Code instead.',
+          'Unable to connect online. Try Offline QR Pairing if you are on the same Wi-Fi.',
         );
       });
     } catch {
-      this.callbacks.onStatusChange('error', 'Failed to initialize WebRTC client.');
+      this.callbacks.onStatusChange('error', 'Could not start connection.');
     }
   }
 
@@ -583,9 +583,9 @@ export class ClientNetworkManager {
         ? { type: payload.t, sdp: payload.s }
         : null;
     if (!offerDesc || offerDesc.type !== 'offer') {
-      throw new Error('Invalid host offer code.');
+      throw new Error('Invalid invite code.');
     }
-    this.callbacks.onStatusChange('connecting', 'Waiting for host to scan or apply your answer...');
+    this.callbacks.onStatusChange('connecting', 'Waiting for the host to scan or enter your reply...');
 
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     this.manualPc = pc;
@@ -625,7 +625,7 @@ export class ClientNetworkManager {
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
         if (!this.disposed && (!this.manualDc || this.manualDc.readyState !== 'open')) {
-          this.callbacks.onStatusChange('disconnected', 'WebRTC connection lost.');
+          this.callbacks.onStatusChange('disconnected', 'Connection to host was lost.');
         }
       }
     };

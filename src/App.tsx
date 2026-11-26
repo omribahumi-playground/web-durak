@@ -172,26 +172,26 @@ export const App: React.FC = () => {
               {session.guestStatus === 'error' || session.guestStatus === 'disconnected'
                 ? 'Connection Notice'
                 : session.pendingManualAnswer
-                  ? 'Send Answer Code to Host'
-                  : 'Establishing WebRTC P2P Link...'}
+                  ? 'Show Reply QR to Host'
+                  : 'Joining Room...'}
             </h2>
             <p className="muted">
-              {session.connectionNote || 'Exchanging SDP & ICE candidates with host...'}
+              {session.connectionNote || 'Connecting to the table...'}
             </p>
             {session.pendingManualAnswer && (
               <div className="manual-answer-wrap">
                 <QrCodeDisplay
                   value={session.pendingManualAnswer}
-                  label="Have the host scan this Answer QR code:"
+                  label="Have the host scan this Reply QR code:"
                 />
-                <label>Or copy &amp; send this Answer Code:</label>
+                <label>Or copy &amp; send this Reply Code:</label>
                 <textarea readOnly rows={3} value={session.pendingManualAnswer} />
                 <button
                   type="button"
                   className="btn btn-gold btn-sm"
                   onClick={() => void navigator.clipboard?.writeText(session.pendingManualAnswer!)}
                 >
-                  Copy Answer Code
+                  Copy Reply Code
                 </button>
               </div>
             )}

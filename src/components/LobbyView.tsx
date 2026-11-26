@@ -51,11 +51,11 @@ interface LobbyViewProps {
 }
 
 const DIFFICULTY_DESCRIPTIONS: Record<BotDifficulty, string> = {
-  easy: 'Relaxed play with occasional suboptimal moves — great for learning.',
+  easy: 'Relaxed play with occasional mistakes — great for learning.',
   normal: 'Solid fundamentals: smart trump conservation, pair leads, and tactical takes.',
-  hard: 'Optimal multi-card defense planning, rank-safe play, and strong endgame pressure.',
-  extreme: 'Relentless card-tracking, tempo exploitation, and endgame lookahead.',
-  master: 'Full card memory, exact 1v1 Alpha-Beta endgame solver, and Monte Carlo mid-game search.',
+  hard: 'Strong defense planning, careful card play, and steady endgame pressure.',
+  extreme: 'Sharp card tracking, aggressive pressure, and tough endgame play.',
+  master: 'Remembers played cards, plans moves ahead, and plays near-perfect endgames.',
 };
 
 export const LobbyView: React.FC<LobbyViewProps> = ({
@@ -65,7 +65,6 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   signalingStatus,
   guestStatus,
   connectionNote,
-  rttMs,
   chatMessages,
   fourColorDeck,
   isPublicTable,
@@ -138,9 +137,9 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
       await onApplyManualAnswer(manualPending.peerId, code);
       setManualPending(null);
       setManualAnswerInput('');
-      setManualMsg('WebRTC DataChannel handshake sent! Waiting for peer to appear in a seat.');
+      setManualMsg('Connecting... Your friend will appear in a seat shortly.');
     } catch (err) {
-      setManualMsg(err instanceof Error ? err.message : 'Invalid answer code.');
+      setManualMsg(err instanceof Error ? err.message : 'Invalid reply code.');
     } finally {
       setManualBusy(false);
     }
@@ -157,7 +156,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
     <div className="lobby-shell">
       <header className="lobby-header">
         <div>
-          <span className="eyebrow">WebRTC Multiplayer Table</span>
+          <span className="eyebrow">Multiplayer Table</span>
           <h1>Durak Lobby</h1>
         </div>
 
@@ -166,12 +165,12 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
             <span className="status-dot" />
             {isHost
               ? signalingStatus === 'connected'
-                ? 'WebRTC P2P Room Live'
+                ? 'Room Live'
                 : signalingStatus === 'connecting'
-                  ? 'Opening P2P Room...'
-                  : 'Offline Mode (Bots & Direct P2P)'
+                  ? 'Opening Room...'
+                  : 'Offline Mode (Bots & QR Pairing)'
               : guestStatus === 'connected'
-                ? `WebRTC P2P Live${rttMs !== null ? ` · ${rttMs}ms` : ''}`
+                ? 'Connected'
                 : `Status: ${guestStatus}`}
           </div>
           <button
@@ -226,7 +225,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                   onClick={() => setShowManual((v) => !v)}
                 >
                   <IconQr size={15} />
-                  <span>{showManual ? 'Hide Offline QR / P2P' : 'Offline QR / P2P'}</span>
+                  <span>{showManual ? 'Hide Offline QR' : 'Offline QR Pairing'}</span>
                 </button>
               )}
             </div>
@@ -234,9 +233,9 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
           {isHost && showManual && (
             <section className="panel manual-panel">
-              <h3>Offline / LAN QR Code Pairing (Zero Internet)</h3>
+              <h3>Offline Wi-Fi QR Pairing</h3>
               <p className="muted-small">
-                Pair two devices on a private Wi-Fi / hotspot with zero internet by scanning Offer &amp; Answer QR codes.
+                Play with friends on the same Wi-Fi or hotspot without internet by scanning each other&apos;s QR codes.
               </p>
               {!manualPending ? (
                 <button
@@ -245,30 +244,30 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                   disabled={manualBusy}
                   onClick={() => void handleGenerateOffer()}
                 >
-                  {manualBusy ? 'Gathering LAN Candidates...' : '1. Generate Offer QR Code'}
+                  {manualBusy ? 'Preparing QR Code...' : '1. Show Invite QR Code'}
                 </button>
               ) : (
                 <div className="manual-steps">
                   <QrCodeDisplay
                     value={manualPending.offerCode}
-                    label="1. Have your friend scan this Offer QR (or copy code):"
+                    label="1. Have your friend scan this Invite QR:"
                   />
                   <div>
                     <div className="manual-row-head">
-                      <label>Offer Code (text fallback)</label>
+                      <label>Invite Code (text option)</label>
                       <button
                         type="button"
                         className="btn btn-ghost btn-xs"
                         onClick={() => copyText(manualPending.offerCode, 'offer')}
                       >
-                        {copied === 'offer' ? 'Copied!' : 'Copy Offer'}
+                        {copied === 'offer' ? 'Copied!' : 'Copy Code'}
                       </button>
                     </div>
                     <textarea readOnly rows={2} value={manualPending.offerCode} />
                   </div>
                   <div className="manual-answer-block">
                     <div className="manual-row-head">
-                      <label>2. Scan or paste your friend&apos;s Answer:</label>
+                      <label>2. Scan or paste your friend&apos;s reply:</label>
                       <button
                         type="button"
                         className="btn btn-gold btn-xs btn-icon-row"
@@ -276,14 +275,14 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                         onClick={() => setScanAnswerOpen(true)}
                       >
                         <IconQr size={13} />
-                        <span>Scan Answer QR</span>
+                        <span>Scan Reply QR</span>
                       </button>
                     </div>
                     <textarea
                       rows={2}
                       value={manualAnswerInput}
                       onChange={(e) => setManualAnswerInput(e.target.value)}
-                      placeholder="Or paste guest's Answer code here..."
+                      placeholder="Or paste your friend's reply code here..."
                     />
                   </div>
                   <div className="manual-actions">
@@ -293,7 +292,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                       disabled={!manualAnswerInput.trim() || manualBusy}
                       onClick={() => void handleApplyAnswer()}
                     >
-                      Connect Peer
+                      Connect Friend
                     </button>
                     <button
                       type="button"
@@ -314,8 +313,8 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
           {scanAnswerOpen && manualPending && (
             <QrScannerModal
-              title="Scan Guest's Answer QR"
-              hint="Point your camera at your friend's Answer QR code to complete the LAN WebRTC link."
+              title="Scan Friend's Reply QR"
+              hint="Point your camera at your friend's reply QR code to connect."
               onClose={() => setScanAnswerOpen(false)}
               onScan={(decoded) => {
                 setScanAnswerOpen(false);
@@ -329,9 +328,9 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
             <section className="panel public-listing-panel">
               <div className="section-head">
                 <div>
-                  <h2>Server Discovery</h2>
+                  <h2>Public Listing</h2>
                   <p className="muted-small">
-                    Keep your room private (code only) or list it in a Public Server so others can find and join it.
+                    Keep your room private (code only) or list it in a Public Hall so other players can find and join it.
                   </p>
                 </div>
                 <div className="segmented-control compact-seg">
@@ -355,7 +354,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               {isPublicTable && (
                 <div className="public-listing-fields">
                   <div className="listing-field">
-                    <label htmlFor="public-server-select">Public Server</label>
+                    <label htmlFor="public-server-select">Public Hall</label>
                     <select
                       id="public-server-select"
                       className="bot-level-select full-select"
@@ -411,7 +410,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                   Table Seats ({filledCount}/{lobby.seats.length})
                 </h2>
                 <p className="muted-small">
-                  Supports 2–4 players with any mix of real WebRTC humans and AI bots.
+                  Supports 2–4 players with any mix of friends and computer players.
                 </p>
               </div>
               {isHost && openCount > 0 && (
@@ -444,7 +443,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                         {seat.name}
                         {isMe && <span className="tag tag-you">You</span>}
                         {seat.kind === 'host' && <span className="tag tag-gold">Host</span>}
-                        {seat.kind === 'remote' && <span className="tag tag-rtc">WebRTC</span>}
+                        {seat.kind === 'remote' && <span className="tag tag-rtc">Friend</span>}
                         {seat.kind === 'bot' && (
                           <span className={`tag tag-bot tag-bot-${seat.botDifficulty ?? lobby.settings.botDifficulty}`}>
                             AI · {BOT_DIFFICULTY_LABELS[seat.botDifficulty ?? lobby.settings.botDifficulty]}
@@ -456,10 +455,10 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                         {seat.kind === 'open'
                           ? 'Waiting for friend to join, or add a computer player'
                           : seat.kind === 'bot'
-                            ? 'Controlled by local AI engine'
+                            ? 'Computer player'
                             : seat.kind === 'host'
                               ? 'Room host'
-                              : 'Connected peer-to-peer'}
+                              : 'Connected player'}
                       </div>
                     </div>
 
@@ -697,7 +696,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
             <h2>Table Chat</h2>
             <div className="chat-feed">
               {chatMessages.length === 0 ? (
-                <p className="muted-tiny">Chat messages travel directly over WebRTC DataChannels.</p>
+                <p className="muted-tiny">Say hello to everyone at the table.</p>
               ) : (
                 chatMessages.map((m) => (
                   <div key={m.id} className={`chat-line ${m.isSystem ? 'chat-system' : ''}`}>

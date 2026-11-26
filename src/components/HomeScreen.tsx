@@ -80,7 +80,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
         <h1 className="home-title">DURAK</h1>
         <p className="home-subtitle">
-          Peer-to-Peer WebRTC Multiplayer &amp; Tactical AI Card Game for 2–4 Players
+          Play Durak with friends or challenge computer opponents — 2 to 4 players
         </p>
 
         <div className="name-bar">
@@ -114,10 +114,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       <section className="panel public-banner">
         <div className="public-banner-info">
-          <div className="panel-badge badge-emerald">Public Servers &amp; Lobby Chat</div>
-          <h2>Browse Public Servers &amp; Open Tables</h2>
+          <div className="panel-badge badge-emerald">Public Halls &amp; Chat</div>
+          <h2>Browse Public Halls &amp; Open Tables</h2>
           <p className="muted">
-            Hang out in global server halls (<strong>{publicServerName}</strong>, Casual Lounge, Competitive Arena, or custom servers), chat with other players, and jump into live WebRTC tables in one click.
+            Hang out in public halls (<strong>{publicServerName}</strong>, Casual Lounge, Competitive Arena, or your own custom hall), chat with other players, and jump into live tables in one click.
           </p>
         </div>
         <div className="public-banner-cta">
@@ -132,7 +132,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onClick={onOpenPublicServers}
           >
             <IconGlobe size={17} />
-            <span>Enter Public Servers</span>
+            <span>Enter Public Halls</span>
           </button>
         </div>
       </section>
@@ -178,12 +178,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
         </section>
 
-        {/* Host WebRTC Room */}
+        {/* Host Multiplayer Room */}
         <section className="panel home-card">
-          <div className="panel-badge badge-gold">WebRTC P2P Host</div>
-          <h2>Create Multiplayer Lobby</h2>
+          <div className="panel-badge badge-gold">Play With Friends</div>
+          <h2>Create Multiplayer Room</h2>
           <p className="muted">
-            Host a 2–4 player room over WebRTC DataChannels. Mix real friends and AI bots freely in any seat.
+            Start a 2–4 player room and share the code with friends. Mix real players and computer opponents in any seat.
           </p>
           <div className="segmented-control" role="group" aria-label="Lobby size">
             {([2, 3, 4] as const).map((size) => (
@@ -206,12 +206,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </button>
         </section>
 
-        {/* Join WebRTC Room */}
+        {/* Join Room */}
         <section className="panel home-card">
           <div className="panel-badge badge-emerald">Join Friend</div>
-          <h2>Join WebRTC Room</h2>
+          <h2>Join a Room</h2>
           <p className="muted">
-            Enter a 6-character Room Code from your friend, or use a Direct Serverless P2P Invite Code.
+            Enter a 6-character Room Code from your friend, or scan their QR code when playing on local Wi-Fi.
           </p>
           <form className="join-form" onSubmit={handleJoinSubmit}>
             <input
@@ -239,7 +239,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onClick={() => setScannerOpen(true)}
           >
             <IconQr size={15} />
-            <span>Scan Host QR Code (Offline / LAN)</span>
+            <span>Scan Invite QR Code (Offline / Wi-Fi)</span>
           </button>
 
           <button
@@ -247,7 +247,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             className="link-toggle"
             onClick={() => setShowManual((v) => !v)}
           >
-            {showManual ? 'Hide' : 'Paste'} Direct Manual P2P Code
+            {showManual ? 'Hide' : 'Paste'} Offline Invite Code
           </button>
 
           {showManual && (
@@ -256,7 +256,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 rows={3}
                 value={manualOffer}
                 onChange={(e) => setManualOffer(e.target.value)}
-                placeholder="Paste host's WebRTC Offer code here..."
+                placeholder="Paste your friend's invite code here..."
               />
               <button
                 type="button"
@@ -264,7 +264,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 disabled={!manualOffer.trim() || manualBusy}
                 onClick={() => void handleManualJoin()}
               >
-                {manualBusy ? 'Generating Answer QR...' : 'Generate Answer QR & Code'}
+                {manualBusy ? 'Creating Reply QR...' : 'Create Reply QR & Code'}
               </button>
               {manualError && <p className="error-text">{manualError}</p>}
             </div>
@@ -274,8 +274,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {scannerOpen && (
         <QrScannerModal
-          title="Scan Host's Offer QR"
-          hint="Point your camera at the host's Direct P2P Offer QR code to pair over LAN or Wi-Fi."
+          title="Scan Invite QR Code"
+          hint="Point your camera at your friend's invite QR code to connect over Wi-Fi."
           onClose={() => setScannerOpen(false)}
           onScan={(decoded) => {
             setScannerOpen(false);

@@ -47,7 +47,7 @@ export const QrCodeDisplay: React.FC<QrCodeDisplayProps> = ({
       ) : dataUrl ? (
         <img
           src={dataUrl}
-          alt={label || 'WebRTC QR Code'}
+          alt={label || 'Invite QR Code'}
           className="qr-image"
           width={size}
           height={size}
@@ -87,7 +87,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     const startCamera = async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
         setCameraError(
-          'Camera access unavailable here (requires HTTPS or permission). Use "Scan from Photo" below instead.',
+          'Camera access isn’t available here. You can scan from a photo or screenshot below instead.',
         );
         setScanning(false);
         return;
@@ -141,7 +141,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       } catch {
         if (!cancelled) {
           setCameraError(
-            'Could not open camera (check permissions or HTTPS). You can still scan from a photo/screenshot below.',
+            'Could not open camera (check browser permissions). You can still scan from a photo or screenshot below.',
           );
           setScanning(false);
         }

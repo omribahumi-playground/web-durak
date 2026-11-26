@@ -354,7 +354,7 @@ export function useDurakSession() {
           onSignalingStatus: (status, note) => {
             setSignalingStatus(status);
             if (note) setConnectionNote(note);
-            else if (status === 'connected') setConnectionNote('WebRTC room live — share code with friends!');
+            else if (status === 'connected') setConnectionNote('Room live — share the code with friends!');
           },
           onRoomCodeChanged: (newCode) => {
             const cur = lobbyRef.current;
@@ -491,7 +491,7 @@ export function useDurakSession() {
                   id: `sys-${Date.now()}`,
                   senderId: 'system',
                   senderName: 'System',
-                  text: `${cleanName} connected via WebRTC P2P!`,
+                  text: `${cleanName} joined the lobby!`,
                   timestamp: Date.now(),
                   isSystem: true,
                 },

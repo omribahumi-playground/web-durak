@@ -77,8 +77,8 @@ export type ServerConnectionStatus = 'connecting' | 'connected' | 'local-only';
 
 const TOPIC_PREFIX = 'durak-p2p-v1/servers';
 const PUBLIC_MQTT_BROKERS = [
-  { url: 'wss://broker.emqx.io:8084/mqtt', label: 'EMQX Public Relay' },
-  { url: 'wss://broker.hivemq.com:8884/mqtt', label: 'HiveMQ Public Relay' },
+  { url: 'wss://broker.emqx.io:8084/mqtt', label: 'Online' },
+  { url: 'wss://broker.hivemq.com:8884/mqtt', label: 'Online' },
 ];
 
 const PRESENCE_TTL_MS = 26_000;

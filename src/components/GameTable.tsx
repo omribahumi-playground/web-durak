@@ -398,7 +398,7 @@ export const GameTable: React.FC<GameTableProps> = ({
 
         <div className="hud-right">
           {role === 'guest' && rttMs !== null && (
-            <span className="hud-chip hud-rtc hud-desktop-only">P2P {rttMs}ms</span>
+            <span className="hud-chip hud-rtc hud-desktop-only">Online</span>
           )}
           <button
             type="button"
@@ -475,7 +475,6 @@ export const GameTable: React.FC<GameTableProps> = ({
             <div className="mobile-menu-meta">
               <span>Room <strong>{roomCode}</strong></span>
               <span>· {game.settings.deckSize}-Card {game.settings.variant === 'passing' ? 'Passing' : 'Classic'}</span>
-              {role === 'guest' && rttMs !== null && <span>· P2P {rttMs}ms</span>}
             </div>
             <div className="mobile-menu-grid">
               <button
