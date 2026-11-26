@@ -29,6 +29,23 @@ import {
 const BOT_NAMES = ['Alex AI', 'Morgan AI', 'Riley AI', 'Casey AI'];
 const AI_BATTLE_PRESETS: BotDifficulty[] = ['master', 'normal', 'extreme', 'easy'];
 
+function pickUniqueBotName(usedNames: Set<string>, preferredIndex = 0): string {
+  const preferred = BOT_NAMES[preferredIndex % BOT_NAMES.length];
+  if (!usedNames.has(preferred)) {
+    usedNames.add(preferred);
+    return preferred;
+  }
+  for (const name of BOT_NAMES) {
+    if (!usedNames.has(name)) {
+      usedNames.add(name);
+      return name;
+    }
+  }
+  const fallback = `Bot ${usedNames.size + 1}`;
+  usedNames.add(fallback);
+  return fallback;
+}
+
 export type BotSpeed = 0.5 | 1 | 2 | 4;
 export type SessionRole = 'home' | 'host' | 'guest';
 
@@ -694,6 +711,9 @@ export function useDurakSession() {
 
       // Seat 0 toggles between Host Playing and AI Bot (Host Spectating!)
       if (seatIndex === 0) {
+        const usedNames = new Set(
+          cur.seats.filter((s, i) => i !== 0 && s.kind === 'bot').map((s) => s.name),
+        );
         const nextSeats = cur.seats.map((s, idx) => {
           if (idx !== 0) return s;
           if (s.kind === 'bot') {
@@ -709,7 +729,7 @@ export function useDurakSession() {
             seatIndex: 0,
             kind: 'bot' as const,
             playerId: `bot-0-${Math.random().toString(36).slice(2, 5)}`,
-            name: BOT_NAMES[0],
+            name: pickUniqueBotName(usedNames, 0),
             botDifficulty: cur.settings.botDifficulty,
             connected: true,
           };
@@ -722,6 +742,11 @@ export function useDurakSession() {
         hostNetRef.current?.disconnectPeer(target.peerId, 'Removed from lobby by host.');
       }
 
+      const usedNames = new Set(
+        cur.seats
+          .filter((s, i) => i !== seatIndex && s.kind === 'bot')
+          .map((s) => s.name),
+      );
       const nextSeats = cur.seats.map((s, idx) => {
         if (idx !== seatIndex) return s;
         if (s.kind === 'bot') {
@@ -737,7 +762,7 @@ export function useDurakSession() {
           seatIndex: idx,
           kind: 'bot' as const,
           playerId: `bot-${idx}-${Math.random().toString(36).slice(2, 5)}`,
-          name: BOT_NAMES[idx % BOT_NAMES.length],
+          name: pickUniqueBotName(usedNames, idx),
           botDifficulty: cur.settings.botDifficulty,
           connected: true,
         };
@@ -766,13 +791,16 @@ export function useDurakSession() {
   const fillOpenSeatsWithBots = useCallback(() => {
     const cur = lobbyRef.current;
     if (!cur || role !== 'host' || cur.inGame) return;
+    const usedNames = new Set(
+      cur.seats.filter((s) => s.kind === 'bot').map((s) => s.name),
+    );
     const nextSeats = cur.seats.map((s, idx) =>
       s.kind === 'open'
         ? {
             seatIndex: idx,
             kind: 'bot' as const,
             playerId: `bot-${idx}-${Math.random().toString(36).slice(2, 5)}`,
-            name: BOT_NAMES[(idx - 1) % BOT_NAMES.length],
+            name: pickUniqueBotName(usedNames, idx),
             botDifficulty: cur.settings.botDifficulty,
             connected: true,
           }
