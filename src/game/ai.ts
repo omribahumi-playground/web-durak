@@ -15,7 +15,7 @@ import { BotDifficulty, Card, GameAction, GameState, Suit } from './types';
 
 function cardValue(card: Card, trumpSuit: Suit, deckCount: number): number {
   const isTrump = card.suit === trumpSuit;
-  const trumpBonus = deckCount > 6 ? 18 : 14;
+  const trumpBonus = deckCount > 6 ? 19 : 15;
   return card.rank + (isTrump ? trumpBonus : 0);
 }
 
@@ -26,10 +26,10 @@ interface DefenseAssignment {
 
 /**
  * Exact minimum-cost bipartite matching for defending all undefended attacks.
- * Used by Hard and Extreme AIs so they never fail a defendable board due to
- * greedy ordering, and prefer cards that don't expose new throw-in ranks.
+ * Used by Hard, Extreme, and Master rollouts so they never fail a defendable board
+ * due to greedy ordering, and prefer cards that don't expose new throw-in ranks.
  */
-function findOptimalDefensePlan(
+export function findOptimalDefensePlan(
   state: GameState,
   hand: Card[],
   undefendedIndices: number[],
@@ -40,6 +40,14 @@ function findOptimalDefensePlan(
   const handRankCounts = new Map<number, number>();
   for (const c of hand) {
     handRankCounts.set(c.rank, (handRankCounts.get(c.rank) ?? 0) + 1);
+  }
+
+  // On Extreme, also account for publicly discarded cards when estimating throw-in exposure
+  const discardedRankCounts = new Map<number, number>();
+  if (difficulty === 'extreme') {
+    for (const c of state.discardedCards ?? []) {
+      discardedRankCounts.set(c.rank, (discardedRankCounts.get(c.rank) ?? 0) + 1);
+    }
   }
 
   // Order most constrained attacks first for fast pruning
@@ -59,23 +67,22 @@ function findOptimalDefensePlan(
 
         // Strongly prefer matching suit over spending a trump
         if (isTrump && attackCard.suit !== state.trumpSuit) {
-          cost += deckCount > 0 ? 10 : 5;
+          cost += deckCount > 0 ? 11 : 6;
         }
 
         // Prefer defending with a rank already on the table (zero new throw-in exposure!)
         if (tableRanks.has(card.rank)) {
-          cost -= difficulty === 'extreme' ? 4.5 : 3;
+          cost -= difficulty === 'extreme' ? 5.5 : 3.5;
         } else if (difficulty === 'extreme') {
-          // If we hold fewer copies of this rank, opponents are more likely to hold it!
           const myCopies = handRankCounts.get(card.rank) ?? 1;
-          const unseenCopies = 4 - myCopies;
-          // Higher risk when many cards remain in play or opponent hands
-          cost += unseenCopies * (deckCount > 0 ? 1.1 : 1.5);
+          const deadCopies = discardedRankCounts.get(card.rank) ?? 0;
+          const unseenCopies = Math.max(0, 4 - myCopies - deadCopies);
+          cost += unseenCopies * (deckCount > 0 ? 1.4 : 1.8);
         }
 
         // Preserve pairs in our own hand when possible on Extreme
         if (difficulty === 'extreme' && !isTrump && (handRankCounts.get(card.rank) ?? 0) >= 2) {
-          cost += 1.5;
+          cost += 1.6;
         }
 
         return { card, cost };
@@ -145,8 +152,7 @@ function greedyDefensePlan(
 
     let chosen: Card;
     if (difficulty === 'easy' && options.length > 1) {
-      // Easy bot occasionally picks a slightly suboptimal (higher) legal card
-      const pickIdx = (state.boutNumber + targetIdx + hand.length) % Math.min(2, options.length);
+      const pickIdx = (state.boutNumber + targetIdx + hand.length) % Math.min(3, options.length);
       chosen = options[pickIdx];
     } else {
       const nonTrump = options.find((c) => c.suit !== state.trumpSuit);
@@ -157,6 +163,39 @@ function greedyDefensePlan(
   }
 
   return planned;
+}
+
+/**
+ * Fast heuristic bot policy for any non-Master difficulty (also used by Master rollouts).
+ */
+export function pickHeuristicActionForPlayer(
+  state: GameState,
+  playerIndex: number,
+  difficulty: Exclude<BotDifficulty, 'master'>,
+): GameAction | null {
+  if (state.phase !== 'playing') return null;
+  const player = state.players[playerIndex];
+  if (!player || player.isOut) return null;
+
+  if (state.subPhase === 'initial_attack') {
+    if (playerIndex !== state.attackerIndex || player.hand.length === 0) return null;
+    return chooseOpeningAttack(state, playerIndex, difficulty);
+  }
+
+  const undefendedIndices: number[] = [];
+  state.table.forEach((pair, idx) => {
+    if (!pair.defense) undefendedIndices.push(idx);
+  });
+
+  if (state.subPhase === 'battle' && playerIndex === state.defenderIndex && undefendedIndices.length > 0) {
+    return chooseDefenseAction(state, playerIndex, undefendedIndices, difficulty);
+  }
+
+  if (playerIndex !== state.defenderIndex && player.hand.length > 0 && !state.passedPlayerIds.includes(player.id)) {
+    return chooseThrowInOrPass(state, playerIndex, difficulty);
+  }
+
+  return null;
 }
 
 /**
@@ -237,7 +276,7 @@ function chooseOpeningAttack(
     (a, b) => cardValue(a, state.trumpSuit, deckCount) - cardValue(b, state.trumpSuit, deckCount),
   );
 
-  // Easy: simple lead, occasionally picks a slightly higher non-optimal card
+  // Easy: relaxed, sometimes leads awkward cards or wastes higher ranks
   if (difficulty === 'easy') {
     const nonTrumps = sorted.filter((c) => c.suit !== state.trumpSuit);
     const pool = nonTrumps.length > 0 ? nonTrumps : sorted;
@@ -245,7 +284,18 @@ function chooseOpeningAttack(
     return { type: 'attack', playerId: player.id, cardId: pool[idx].id };
   }
 
-  // Group non-trumps by rank
+  // Normal: solid fundamentals — leads lowest card (or occasional low pair <= 9)
+  if (difficulty === 'normal') {
+    const lowPair = sorted.find(
+      (c) =>
+        c.suit !== state.trumpSuit &&
+        c.rank <= 9 &&
+        sorted.filter((o) => o.suit !== state.trumpSuit && o.rank === c.rank).length >= 2,
+    );
+    return { type: 'attack', playerId: player.id, cardId: (lowPair ?? sorted[0]).id };
+  }
+
+  // Group non-trumps by rank for Hard & Extreme
   const rankGroups = new Map<number, Card[]>();
   for (const c of sorted) {
     if (c.suit !== state.trumpSuit) {
@@ -255,18 +305,8 @@ function chooseOpeningAttack(
     }
   }
 
-  // Normal (previous Tactical behavior): low non-trump pair <= J, else lowest card
-  if (difficulty === 'normal') {
-    for (const [rank, cards] of rankGroups) {
-      if (rank <= 11 && cards.length >= 2) {
-        return { type: 'attack', playerId: player.id, cardId: cards[0].id };
-      }
-    }
-    return { type: 'attack', playerId: player.id, cardId: sorted[0].id };
-  }
-
-  // Hard & Extreme: strategic scoring of every candidate opening card
   const activeCount = state.players.filter((p) => !p.isOut).length;
+  const knownDefenderCards = state.knownOpponentCards?.[defender.id] ?? [];
   let bestCard = sorted[0];
   let bestScore = Infinity;
 
@@ -274,35 +314,35 @@ function chooseOpeningAttack(
     const isTrump = card.suit === state.trumpSuit;
     let score = cardValue(card, state.trumpSuit, deckCount);
 
-    // Bonus for leading from a pair/triple of non-trumps (creates guaranteed throw-ins!)
+    // Leading from a non-trump pair/triple creates guaranteed throw-in pressure
     const sameRankNonTrumps = rankGroups.get(card.rank) ?? [];
     if (!isTrump && sameRankNonTrumps.length >= 2) {
-      score -= sameRankNonTrumps.length === 3 ? 7 : 4.5;
+      score -= sameRankNonTrumps.length === 3 ? 8 : 5;
     }
 
-    // In Passing mode, avoid leading a rank if we only have 1 copy and defender has many cards
-    if (state.settings.variant === 'passing' && !isTrump && sameRankNonTrumps.length === 1 && defender.hand.length >= 4) {
-      score += 1.5;
+    // Passing mode awareness: avoid feeding known Passing cards to defender!
+    if (state.settings.variant === 'passing') {
+      if (difficulty === 'extreme' && knownDefenderCards.some((k) => k.rank === card.rank)) {
+        score += 9;
+      } else if (!isTrump && sameRankNonTrumps.length === 1 && defender.hand.length >= 4) {
+        score += 1.8;
+      }
     }
 
-    // Extreme: endgame lookahead when deck is empty and we are trying to force takes or go out!
     if (difficulty === 'extreme') {
-      // Count how many other cards in our hand share this rank (including trump)
+      // Remembered defender cards: if we know defender holds a card that can't beat ours,
+      // or holds the same rank in Classic mode (we can keep pressuring), adjust score
       const totalMyRank = player.hand.filter((c) => c.rank === card.rank).length;
       if (totalMyRank >= 2 && !isTrump) {
         score -= 2.5;
       }
 
-      // If deck is empty and defender has few cards (endgame pressure), prefer ranks that can overwhelm defender
       if (deckCount === 0) {
-        // Check if we can force defender to take in 1v1 endgame!
         if (activeCount === 2) {
           const defenderCanBeat = defender.hand.some((d) => canBeat(card, d, state.trumpSuit));
           if (!defenderCanBeat) {
-            // Guaranteed take -> keeps our attack turn! Massive bonus unless burning our only ace trump needlessly
-            score -= 28;
+            score -= 26;
           } else {
-            // See what defender's cheapest response would be and whether we have a follow-up throw-in!
             const cheapestDefense = [...defender.hand]
               .filter((d) => canBeat(card, d, state.trumpSuit))
               .sort((a, b) => cardValue(a, state.trumpSuit, 0) - cardValue(b, state.trumpSuit, 0))[0];
@@ -311,23 +351,15 @@ function chooseOpeningAttack(
                 (c) => c.id !== card.id && (c.rank === card.rank || c.rank === cheapestDefense.rank),
               );
               if (hasFollowUp) score -= 6;
-              // Forcing defender to burn a high trump is very strong!
-              if (cheapestDefense.suit === state.trumpSuit && !isTrump) {
-                score -= 8;
-              }
+              if (cheapestDefense.suit === state.trumpSuit && !isTrump) score -= 7;
             }
           }
         }
-
-        // If we have 2 cards left and one is a high trump, lead the weaker card first so trump stays for last
         if (player.hand.length === 2 && isTrump) {
           score += 5;
         }
-      } else {
-        // Midgame: prefer dumping awkward medium-low non-trumps while keeping high trumps
-        if (isTrump && card.rank >= 11) {
-          score += 9;
-        }
+      } else if (isTrump && card.rank >= 11) {
+        score += 10;
       }
     }
 
@@ -348,6 +380,7 @@ function chooseDefenseAction(
 ): GameAction {
   const defender = state.players[defenderIndex];
   const deckCount = state.deck.length;
+  const activeCount = state.players.filter((p) => !p.isOut).length;
 
   // Check Passing mode opportunity first
   if (state.settings.variant === 'passing') {
@@ -372,9 +405,12 @@ function chooseDefenseAction(
         difficulty === 'easy'
           ? bestPass.suit !== state.trumpSuit && state.boutNumber % 2 === 0
           : difficulty === 'normal'
-            ? bestPass.suit !== state.trumpSuit || bestPass.rank <= 10 || deckCount === 0
-            : // Hard & Extreme: almost always pass with non-trump or low/mid trump (huge tempo win!)
-              bestPass.suit !== state.trumpSuit || bestPass.rank <= 11 || deckCount === 0 || state.table.length >= 2;
+            ? bestPass.suit !== state.trumpSuit || bestPass.rank <= 9 || deckCount === 0
+            : // Hard & Extreme: pass aggressively — huge tempo & card-preservation advantage!
+              bestPass.suit !== state.trumpSuit ||
+              bestPass.rank <= 11 ||
+              deckCount === 0 ||
+              state.table.length >= 2;
 
       if (shouldPass) {
         return {
@@ -399,44 +435,53 @@ function chooseDefenseAction(
     return { type: 'take', playerId: defender.id };
   }
 
-  // Strategic early-take evaluation (Normal / Hard / Extreme)
+  // Strategic early-take evaluation (carefully calibrated by player count!
+  // In 3-4 player games, taking invites 2-3 attackers to pile garbage on you, so be much stricter!)
   if (difficulty !== 'easy' && canDefenderTake(state, defenderIndex)) {
     const tableCardsCount = state.table.reduce((sum, p) => sum + 1 + (p.defense ? 1 : 0), 0);
     const trumpsSpent = plannedDefenses.filter(
-      (d) => d.card.suit === state.trumpSuit && state.table[d.targetIndex].attack.suit !== state.trumpSuit,
+      (d) =>
+        d.card.suit === state.trumpSuit &&
+        state.table[d.targetIndex].attack.suit !== state.trumpSuit,
     );
-    const highTrumpSpent = trumpsSpent.some((d) => d.card.rank >= 12);
+    const aceOrKingTrumpSpent = trumpsSpent.some((d) => d.card.rank >= 13);
+    const queenPlusTrumpSpent = trumpsSpent.some((d) => d.card.rank >= 12);
 
     if (difficulty === 'normal') {
-      if (deckCount > 6 && highTrumpSpent && tableCardsCount <= 3 && defender.hand.length <= 7) {
+      // Normal occasionally takes unnecessarily early in 4p or burns trumps in 2p
+      if (deckCount > 8 && queenPlusTrumpSpent && tableCardsCount <= 3 && defender.hand.length <= 7) {
         return { type: 'take', playerId: defender.id };
       }
     } else if (difficulty === 'hard') {
-      // Take if deck is rich and defending burns a Q+ trump or 2+ trumps for just a couple cards
-      const burningTooManyTrumps =
-        deckCount > 6 &&
-        ((highTrumpSpent && tableCardsCount <= 3) || (trumpsSpent.length >= 2 && tableCardsCount <= 4)) &&
-        defender.hand.length <= 7;
-      if (burningTooManyTrumps) {
+      // Hard only takes early in 3-4p if saving a K/A trump with plenty of deck left & small hand;
+      // in 2p can take to save Q+ trumps earlier
+      const allowTake =
+        activeCount <= 2
+          ? deckCount > 6 && queenPlusTrumpSpent && tableCardsCount <= 3 && defender.hand.length <= 7
+          : deckCount > 10 && aceOrKingTrumpSpent && tableCardsCount <= 2 && defender.hand.length <= 6;
+      if (allowTake) {
         return { type: 'take', playerId: defender.id };
       }
     } else if (difficulty === 'extreme') {
-      // Extreme also checks whether taking captures a trump card on the table cheaply!
       const tableHasTrump = state.table.some(
         (p) => p.attack.suit === state.trumpSuit || p.defense?.suit === state.trumpSuit,
       );
-      const burningHighTrumpEarly =
-        deckCount > 5 &&
-        ((highTrumpSpent && tableCardsCount <= 4) ||
-          (trumpsSpent.length >= 2 && tableCardsCount <= 5) ||
-          (tableHasTrump && trumpsSpent.length >= 1 && tableCardsCount <= 2 && defender.hand.length <= 6));
-      if (burningHighTrumpEarly && defender.hand.length <= 8) {
+      const allowTake =
+        activeCount <= 2
+          ? deckCount > 5 &&
+            ((queenPlusTrumpSpent && tableCardsCount <= 3) ||
+              (tableHasTrump && trumpsSpent.length >= 1 && tableCardsCount <= 2)) &&
+            defender.hand.length <= 7
+          : deckCount > 10 &&
+            aceOrKingTrumpSpent &&
+            tableCardsCount <= 2 &&
+            defender.hand.length <= 5;
+      if (allowTake) {
         return { type: 'take', playerId: defender.id };
       }
     }
   }
 
-  // Hard & Extreme: defend the highest-value attack first, or non-trump defense first
   const nextMove = plannedDefenses[0];
   return {
     type: 'defend',
@@ -455,6 +500,7 @@ function chooseThrowInOrPass(
   const defender = state.players[state.defenderIndex];
   const deckCount = state.deck.length;
   const maxAttacks = getMaxTableAttacks(state);
+  const activeCount = state.players.filter((p) => !p.isOut).length;
 
   const playable =
     state.table.length < maxAttacks
@@ -474,66 +520,57 @@ function chooseThrowInOrPass(
     if (state.subPhase === 'taking') {
       let shouldThrowIn = false;
       if (difficulty === 'easy') {
-        // Easy bot only throws in low non-trumps while defender takes
         shouldThrowIn = !isTrump && best.rank <= 10;
       } else if (difficulty === 'normal') {
         shouldThrowIn = !isTrump
-          ? best.rank <= 12 || deckCount === 0 || player.hand.length <= 2
+          ? best.rank <= 11 || deckCount === 0
           : player.hand.length === 1 && deckCount === 0;
       } else if (difficulty === 'hard') {
-        // Hard dumps all non-trumps up to K (or A in late game) to bloat defender's hand
         shouldThrowIn = !isTrump
           ? best.rank <= 13 || deckCount <= 4 || player.hand.length <= 3
           : player.hand.length === 1 && deckCount === 0;
       } else {
-        // Extreme: ruthlessly dumps non-trumps (except keeping an Ace if deck is still rich and we have few cards),
-        // and throws in a trump if it empties our hand in endgame!
+        // Extreme: dump all non-trumps up to K (and Aces in late game / when hand is small) to bloat defender!
         shouldThrowIn = !isTrump
           ? best.rank <= 13 || deckCount <= 6 || player.hand.length <= 4
-          : deckCount === 0 && player.hand.length <= 2 && best.rank <= 10;
+          : deckCount === 0 && player.hand.length === 1;
       }
 
       if (shouldThrowIn) {
         return { type: 'attack', playerId: player.id, cardId: best.id };
       }
     } else {
-      // In battle subphase
+      // Battle subphase throw-ins
       let shouldThrowIn = false;
       if (difficulty === 'easy') {
-        // Easy sometimes skips throw-ins on higher cards and occasionally wastes low trumps
-        shouldThrowIn = !isTrump ? best.rank <= 11 : best.rank <= 9;
+        shouldThrowIn = !isTrump ? best.rank <= 11 : best.rank <= 10;
       } else if (difficulty === 'normal') {
         shouldThrowIn = !isTrump
-          ? true
-          : deckCount === 0 || (player.hand.length <= 2 && best.rank <= 11);
+          ? best.rank <= 13 || deckCount <= 6
+          : deckCount === 0 && best.rank <= 10;
       } else if (difficulty === 'hard') {
-        // Hard throws in non-trumps, and uses low/mid trumps when defender is close to winning or deck is nearly empty
+        // Hard keeps trumps for endgame unless defender is about to escape or deck is empty
         shouldThrowIn = !isTrump
           ? best.rank <= 13 || deckCount <= 6 || defender.hand.length <= 3
-          : deckCount === 0 || (deckCount <= 4 && best.rank <= 10) || (defender.hand.length <= 2 && best.rank <= 11);
+          : deckCount === 0 && (best.rank <= 10 || player.hand.length <= 2);
       } else {
-        // Extreme: checks whether throwing in can overwhelm the defender or help us empty our hand!
         const nextAfterDef = getNextActivePlayerIndex(state.players, state.defenderIndex);
         const takingGivesUsTurn = nextAfterDef === playerIndex;
 
         if (!isTrump) {
-          // Don't feed an Ace early unless defender is short on cards or taking gives us turn
           shouldThrowIn =
             best.rank <= 13 ||
-            deckCount <= 8 ||
-            defender.hand.length <= 3 ||
-            takingGivesUsTurn;
+            deckCount <= 4 ||
+            defender.hand.length <= 2 ||
+            (takingGivesUsTurn && deckCount <= 6);
         } else {
-          // Throw in a trump in endgame, or when we know defender cannot beat it in 1v1 endgame!
-          const activeCount = state.players.filter((p) => !p.isOut).length;
           const unblockableInEndgame =
             deckCount === 0 &&
             activeCount === 2 &&
             !defender.hand.some((d) => canBeat(best, d, state.trumpSuit));
           shouldThrowIn =
             unblockableInEndgame ||
-            (deckCount === 0 && (best.rank <= 11 || player.hand.length <= 2)) ||
-            (defender.hand.length === 1 && best.rank <= 10);
+            (deckCount === 0 && (best.rank <= 10 || player.hand.length <= 2));
         }
       }
 

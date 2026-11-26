@@ -1,5 +1,4 @@
 import {
-  allAttacksDefended,
   applyGameAction,
   canBeat,
   canDefenderTake,
@@ -11,6 +10,7 @@ import {
   getMaxTableAttacks,
   getTableRanks,
 } from './engine';
+import { pickHeuristicActionForPlayer } from './ai';
 import { Card, GameAction, GameState, PlayerState, Suit } from './types';
 
 function seededRng(seed: number): () => number {
@@ -79,7 +79,6 @@ function buildMasterBelief(state: GameState, masterIndex: number): MasterBelief 
     knownByPlayer[p.id] = validKnown;
   }
 
-  // If the talon still has cards, the bottom trump card is publicly visible in the deck
   const trumpInDeck = state.deck.length > 0 && !accountedIds.has(state.trumpCard.id);
   if (trumpInDeck) {
     accountedIds.add(state.trumpCard.id);
@@ -120,13 +119,10 @@ function countLiveBeaters(card: Card, belief: MasterBelief, trumpSuit: Suit): nu
 
 function cardStrength(card: Card, trumpSuit: Suit, deckCount: number): number {
   const isTrump = card.suit === trumpSuit;
-  const trumpBonus = deckCount > 6 ? 18 : 15;
+  const trumpBonus = deckCount > 6 ? 19 : 15;
   return card.rank + (isTrump ? trumpBonus : 0);
 }
 
-/**
- * Finds who is the next actor in any GameState (used by Minimax and rollouts).
- */
 function getActiveActorIndex(state: GameState): number | null {
   if (state.phase !== 'playing') return null;
 
@@ -156,12 +152,12 @@ function getActiveActorIndex(state: GameState): number | null {
 }
 
 /**
- * Generates clean, well-ordered legal actions for a given player in a state.
+ * Generates clean, well-ordered candidate actions for Master (and Alpha-Beta).
  */
 function getOrderedLegalActions(
   state: GameState,
   playerIndex: number,
-  maxActions = 12,
+  maxActions = 10,
   belief?: MasterBelief,
 ): GameAction[] {
   const player = state.players[playerIndex];
@@ -181,9 +177,9 @@ function getOrderedLegalActions(
     for (const card of player.hand) {
       let prio = cardStrength(card, state.trumpSuit, deckCount);
       const pairCount = rankCounts.get(card.rank) ?? 0;
-      if (card.suit !== state.trumpSuit && pairCount >= 2) prio -= 5.5;
+      if (card.suit !== state.trumpSuit && pairCount >= 2) prio -= 6;
       if (belief && deckCount === 0 && countLiveBeaters(card, belief, state.trumpSuit) === 0) {
-        prio -= 14;
+        prio -= 16;
       }
       actions.push({
         action: { type: 'attack', playerId: player.id, cardId: card.id },
@@ -212,7 +208,7 @@ function getOrderedLegalActions(
             (idx) => state.players[idx].hand.length,
           )
         ) {
-          const prio = cardStrength(card, state.trumpSuit, deckCount) - 8;
+          const prio = cardStrength(card, state.trumpSuit, deckCount) - 9;
           actions.push({
             action: { type: 'pass_attack', playerId: player.id, cardId: card.id },
             priority: prio,
@@ -221,12 +217,16 @@ function getOrderedLegalActions(
       }
     }
 
-    // 2. Defend the hardest undefended attack first to cut branching factor cleanly
-    const targetIdx = [...undefendedIndices].sort(
-      (a, b) =>
+    // 2. Defend most constrained undefended attack first to minimize branching
+    const targetIdx = [...undefendedIndices].sort((a, b) => {
+      const aOpts = player.hand.filter((c) => canBeat(state.table[a].attack, c, state.trumpSuit)).length;
+      const bOpts = player.hand.filter((c) => canBeat(state.table[b].attack, c, state.trumpSuit)).length;
+      if (aOpts !== bOpts) return aOpts - bOpts;
+      return (
         cardStrength(state.table[b].attack, state.trumpSuit, deckCount) -
-        cardStrength(state.table[a].attack, state.trumpSuit, deckCount),
-    )[0];
+        cardStrength(state.table[a].attack, state.trumpSuit, deckCount)
+      );
+    })[0];
     const attackCard = state.table[targetIdx].attack;
     const tableRanks = getTableRanks(state);
 
@@ -234,12 +234,12 @@ function getOrderedLegalActions(
       if (canBeat(attackCard, card, state.trumpSuit)) {
         let prio = cardStrength(card, state.trumpSuit, deckCount);
         if (card.suit === state.trumpSuit && attackCard.suit !== state.trumpSuit) {
-          prio += 8;
+          prio += 9;
         }
         if (tableRanks.has(card.rank)) {
-          prio -= 4;
+          prio -= 5;
         } else if (belief) {
-          prio += (belief.liveRankCounts.get(card.rank) ?? 0) * 1.4;
+          prio += (belief.liveRankCounts.get(card.rank) ?? 0) * 1.5;
         }
         actions.push({
           action: {
@@ -253,11 +253,11 @@ function getOrderedLegalActions(
       }
     }
 
-    // 3. Take option (always considered as a strategic choice!)
+    // 3. Always include Take as a candidate (PIMC full-game rollouts will evaluate if Take truly wins!)
     if (canDefenderTake(state, playerIndex)) {
       actions.push({
         action: { type: 'take', playerId: player.id },
-        priority: 36,
+        priority: 38,
       });
     }
 
@@ -272,7 +272,7 @@ function getOrderedLegalActions(
       if (canPlayAttackCard(state, playerIndex, card)) {
         let prio = cardStrength(card, state.trumpSuit, deckCount);
         if (card.suit === state.trumpSuit && deckCount > 0) {
-          prio += 12;
+          prio += 14;
         }
         actions.push({
           action: { type: 'attack', playerId: player.id, cardId: card.id },
@@ -285,7 +285,7 @@ function getOrderedLegalActions(
   if (canPlayerPassTurn(state, playerIndex, player.hand.length)) {
     actions.push({
       action: { type: 'pass_turn', playerId: player.id },
-      priority: state.subPhase === 'taking' ? 22 : 24,
+      priority: state.subPhase === 'taking' ? 20 : 22,
     });
   }
 
@@ -294,105 +294,34 @@ function getOrderedLegalActions(
 }
 
 /**
- * Evaluates a position from Master's perspective.
- * Combines game outcome, hand count, trump quality, pair synergy,
- * initiative, and last-card / bottom-trump control.
+ * Evaluates a finished (or near-finished) game outcome from Master's perspective.
+ * Heavily prioritizes NOT being the Durak, with strong secondary reward for finishing 1st!
  */
-function evaluateMasterPosition(
-  state: GameState,
-  masterId: string,
-  belief?: MasterBelief,
-): number {
-  const masterIdx = state.players.findIndex((p) => p.id === masterId);
-  if (masterIdx === -1) return 0;
-  const master = state.players[masterIdx];
+function scoreGameOutcome(state: GameState, masterId: string): number {
+  const master = state.players.find((p) => p.id === masterId);
+  if (!master) return 0;
 
   if (state.phase === 'finished') {
-    if (state.isDraw) return 0;
-    if (state.durakId === masterId) return -10_000;
-    return 10_000;
+    if (state.isDraw) return 15;
+    if (state.durakId === masterId) return -140;
+    // Escaped! Bonus for earlier finish order (1st > 2nd > 3rd)
+    const order = master.finishOrder ?? 2;
+    return 100 + Math.max(0, 4 - order) * 14;
   }
 
-  // Already escaped in 3-4 player game!
-  if (master.isOut) return 9_500;
+  // Master already escaped mid-game in 3-4 player match!
+  if (master.isOut) {
+    const order = master.finishOrder ?? 1;
+    return 100 + Math.max(0, 4 - order) * 14;
+  }
 
+  // Fallback leaf heuristic if a rare rollout hits the step cap
   const deckCount = state.deck.length;
-  const activeOpponents = state.players.filter((p) => p.id !== masterId && !p.isOut);
-  const avgOppCards =
-    activeOpponents.reduce((sum, p) => sum + p.hand.length, 0) /
-    Math.max(1, activeOpponents.length);
-  const minOppCards = Math.min(...activeOpponents.map((p) => p.hand.length));
-
-  let score = 0;
-
-  // 1. Hand size advantage (decisive in endgame, nuanced in early/mid game)
-  if (deckCount === 0) {
-    score += (avgOppCards - master.hand.length) * 34;
-    if (minOppCards === 1) score -= 45;
-    if (master.hand.length === 1) score += 40;
-  } else {
-    // Early/midgame: holding >6 cards is costly, holding extra cards right before deck empties is bad
-    const excessMaster = Math.max(0, master.hand.length - 6);
-    const excessOpp = Math.max(0, avgOppCards - 6);
-    score += (excessOpp - excessMaster) * 14;
-    if (deckCount <= 6) {
-      // Transitioning to endgame: card count starts mattering strongly
-      score += (avgOppCards - master.hand.length) * 12;
-    }
-  }
-
-  // 2. Card quality in Master's hand (trumps, unbeatable cards, pair synergy, deadweight)
-  const rankCounts = new Map<number, number>();
-  let trumpCount = 0;
-  for (const c of master.hand) {
-    rankCounts.set(c.rank, (rankCounts.get(c.rank) ?? 0) + 1);
-    const isTrump = c.suit === state.trumpSuit;
-    if (isTrump) {
-      trumpCount += 1;
-      // High trumps are huge assets throughout the game
-      score += 14 + (c.rank - 6) * 2.2;
-      if (belief && countLiveBeaters(c, belief, state.trumpSuit) === 0) {
-        score += 12; // Unbeatable trump!
-      }
-    } else {
-      // In endgame, high non-trumps are strong; low singletons are liabilities
-      if (deckCount === 0) {
-        score += (c.rank - 9) * 1.4;
-      } else {
-        score += (c.rank - 8) * 1.1;
-      }
-    }
-  }
-
-  // Bonus for holding pairs/triples (huge attacking & passing leverage)
-  for (const [, count] of rankCounts) {
-    if (count >= 2) score += count * 4.5;
-  }
-
-  // Having zero trumps in endgame is dangerous unless hand is tiny
-  if (deckCount <= 4 && trumpCount === 0 && master.hand.length >= 3) {
-    score -= 18;
-  }
-
-  // 3. Initiative & Bout state
-  if (state.attackerIndex === masterIdx) {
-    score += deckCount === 0 ? 18 : 7;
-  } else if (state.defenderIndex === masterIdx) {
-    score -= deckCount === 0 ? 12 : 4;
-    if (state.subPhase === 'taking') {
-      score -= 18;
-    }
-  } else if (state.subPhase === 'taking') {
-    // An opponent is taking cards -> great for us!
-    score += 16;
-  }
-
-  // 4. Bottom trump card ownership bonus when deck just emptied!
-  if (deckCount === 0 && master.hand.some((c) => c.id === state.trumpCard.id)) {
-    score += 10;
-  }
-
-  return score;
+  const activeOpps = state.players.filter((p) => p.id !== masterId && !p.isOut);
+  const avgOpp =
+    activeOpps.reduce((sum, p) => sum + p.hand.length, 0) / Math.max(1, activeOpps.length);
+  const myTrumps = master.hand.filter((c) => c.suit === state.trumpSuit).length;
+  return (avgOpp - master.hand.length) * (deckCount === 0 ? 18 : 9) + myTrumps * 8;
 }
 
 function stateHash(state: GameState): string {
@@ -407,7 +336,7 @@ function stateHash(state: GameState): string {
 
 /**
  * Exact Alpha-Beta Minimax solver for 1v1 endgames (deck === 0).
- * Uses ONLY the opponent hand deduced via fair card counting!
+ * Uses ONLY the opponent hand deduced via fair public card counting!
  */
 function solveEndgame1v1(
   state: GameState,
@@ -423,10 +352,9 @@ function solveEndgame1v1(
   if (oppIndex === undefined) return null;
   const opp = state.players[oppIndex];
 
-  // Reconstruct opponent's hand strictly from public card counting
   const deducedOppHand = [...(belief.knownByPlayer[opp.id] ?? []), ...belief.unseenPool];
   if (deducedOppHand.length !== opp.hand.length) {
-    return null; // Safety check if custom test state had non-standard card count
+    return null;
   }
 
   const perfectState: GameState = {
@@ -443,8 +371,8 @@ function solveEndgame1v1(
 
   const tt = new Map<string, { depth: number; score: number }>();
   let nodesVisited = 0;
-  const NODE_LIMIT = 5_500;
-  const MAX_DEPTH = 10;
+  const NODE_LIMIT = 10_000;
+  const MAX_DEPTH = 14;
 
   const alphabeta = (
     sim: GameState,
@@ -458,7 +386,7 @@ function solveEndgame1v1(
       return sim.durakId === masterId ? -10_000 - depth : 10_000 + depth;
     }
     if (depth <= 0 || nodesVisited >= NODE_LIMIT) {
-      return evaluateMasterPosition(sim, masterId, belief);
+      return scoreGameOutcome(sim, masterId) * 10;
     }
 
     const key = stateHash(sim);
@@ -469,13 +397,13 @@ function solveEndgame1v1(
 
     const actorIdx = getActiveActorIndex(sim);
     if (actorIdx === null) {
-      return evaluateMasterPosition(sim, masterId, belief);
+      return scoreGameOutcome(sim, masterId) * 10;
     }
 
     const isMax = actorIdx === masterIndex;
     const moves = getOrderedLegalActions(sim, actorIdx, 8, isMax ? belief : undefined);
     if (moves.length === 0) {
-      return evaluateMasterPosition(sim, masterId, belief);
+      return scoreGameOutcome(sim, masterId) * 10;
     }
 
     let bestScore = isMax ? -Infinity : Infinity;
@@ -493,7 +421,7 @@ function solveEndgame1v1(
       if (beta <= alpha || nodesVisited >= NODE_LIMIT) break;
     }
 
-    if (tt.size < 4000) {
+    if (tt.size < 6000) {
       tt.set(key, { depth, score: bestScore });
     }
     return bestScore;
@@ -519,110 +447,6 @@ function solveEndgame1v1(
 }
 
 /**
- * Fast tactical rollout policy used inside Monte Carlo simulations.
- */
-function pickFastRolloutAction(state: GameState, actorIdx: number): GameAction | null {
-  const player = state.players[actorIdx];
-  if (!player || player.isOut) return null;
-  const deckCount = state.deck.length;
-
-  if (state.subPhase === 'initial_attack') {
-    const sorted = [...player.hand].sort(
-      (a, b) => cardStrength(a, state.trumpSuit, deckCount) - cardStrength(b, state.trumpSuit, deckCount),
-    );
-    // Prefer low non-trump pair
-    const counts = new Map<number, Card[]>();
-    for (const c of sorted) {
-      if (c.suit !== state.trumpSuit && c.rank <= 12) {
-        const arr = counts.get(c.rank) ?? [];
-        arr.push(c);
-        counts.set(c.rank, arr);
-      }
-    }
-    for (const [, arr] of counts) {
-      if (arr.length >= 2) {
-        return { type: 'attack', playerId: player.id, cardId: arr[0].id };
-      }
-    }
-    return sorted[0] ? { type: 'attack', playerId: player.id, cardId: sorted[0].id } : null;
-  }
-
-  if (state.subPhase === 'battle' && actorIdx === state.defenderIndex) {
-    // Pass if possible with non-trump or low trump
-    if (state.settings.variant === 'passing') {
-      const passCard = player.hand
-        .filter((c) =>
-          canPassAttackCard(state, actorIdx, c, (idx) => state.players[idx].hand.length),
-        )
-        .sort((a, b) => cardStrength(a, state.trumpSuit, deckCount) - cardStrength(b, state.trumpSuit, deckCount))[0];
-      if (passCard && (passCard.suit !== state.trumpSuit || passCard.rank <= 10 || deckCount === 0)) {
-        return { type: 'pass_attack', playerId: player.id, cardId: passCard.id };
-      }
-    }
-
-    const undefIdx = state.table.findIndex((p) => p.defense === null);
-    if (undefIdx === -1) return null;
-    const attackCard = state.table[undefIdx].attack;
-    const options = player.hand
-      .filter((c) => canBeat(attackCard, c, state.trumpSuit))
-      .sort((a, b) => cardStrength(a, state.trumpSuit, deckCount) - cardStrength(b, state.trumpSuit, deckCount));
-
-    if (options.length === 0) {
-      return { type: 'take', playerId: player.id };
-    }
-    const nonTrump = options.find((c) => c.suit !== state.trumpSuit);
-    const chosen = nonTrump ?? options[0];
-
-    // Take early if forced to burn Q+ trump while deck is rich
-    if (
-      deckCount > 6 &&
-      chosen.suit === state.trumpSuit &&
-      chosen.rank >= 12 &&
-      attackCard.suit !== state.trumpSuit &&
-      state.table.length <= 2 &&
-      player.hand.length <= 7
-    ) {
-      return { type: 'take', playerId: player.id };
-    }
-
-    return {
-      type: 'defend',
-      playerId: player.id,
-      cardId: chosen.id,
-      targetIndex: undefIdx,
-    };
-  }
-
-  // Throw-in or pass
-  const maxAttacks = getMaxTableAttacks(state);
-  if (state.table.length < maxAttacks) {
-    const playable = player.hand
-      .filter((c) => canPlayAttackCard(state, actorIdx, c))
-      .sort((a, b) => cardStrength(a, state.trumpSuit, deckCount) - cardStrength(b, state.trumpSuit, deckCount));
-    if (playable.length > 0) {
-      const best = playable[0];
-      const isTrump = best.suit === state.trumpSuit;
-      const shouldThrow =
-        state.subPhase === 'taking'
-          ? !isTrump
-            ? best.rank <= 13 || deckCount <= 4
-            : player.hand.length === 1 && deckCount === 0
-          : !isTrump
-            ? best.rank <= 13 || deckCount <= 6
-            : deckCount === 0 && best.rank <= 11;
-      if (shouldThrow && (allAttacksDefended(state) || state.subPhase === 'taking' || actorIdx === state.attackerIndex)) {
-        return { type: 'attack', playerId: player.id, cardId: best.id };
-      }
-    }
-  }
-
-  if (canPlayerPassTurn(state, actorIdx, player.hand.length)) {
-    return { type: 'pass_turn', playerId: player.id };
-  }
-  return null;
-}
-
-/**
  * Samples a single consistent world (determinization) from Master's public belief state.
  */
 function sampleConsistentWorld(
@@ -644,7 +468,6 @@ function sampleConsistentWorld(
     return { ...p, hand: [...known, ...sampled] };
   });
 
-  // Remaining unseen cards go into the deck, with the visible trumpCard at the bottom!
   const deck: Card[] = [];
   if (state.deck.length > 0) {
     const unknownDeckCount = Math.max(0, state.deck.length - 1);
@@ -660,14 +483,17 @@ function sampleConsistentWorld(
 }
 
 /**
- * Determinized Monte Carlo search for mid-game and 3-4 player tables.
+ * Full-Game Perfect-Information Monte Carlo (PIMC) search!
+ * Samples consistent worlds from Master's fair belief state, plays each candidate
+ * move ALL THE WAY TO GAME OVER using the strong Extreme policy, and picks the
+ * move with the highest actual win/escape rate!
  */
-function searchMidgameDeterminized(
+function searchFullGamePimc(
   state: GameState,
   masterIndex: number,
   belief: MasterBelief,
 ): GameAction | null {
-  const candidates = getOrderedLegalActions(state, masterIndex, 9, belief);
+  const candidates = getOrderedLegalActions(state, masterIndex, 7, belief);
   if (candidates.length === 0) return null;
   if (candidates.length === 1) return candidates[0];
 
@@ -676,11 +502,16 @@ function searchMidgameDeterminized(
     (state.version * 73856093) ^ (state.boutNumber * 19349663) ^ (state.table.length * 83492791),
   );
 
-  // Use 16 sampled worlds with up to 14-ply rollouts (fast: ~8-18ms total)
-  const WORLD_COUNT = 16;
-  const MAX_PLIES = 14;
+  // Adaptive world count: more worlds when few candidates or in critical late-game!
+  const worldCount =
+    candidates.length <= 3
+      ? 28
+      : state.deck.length <= 8
+        ? 22
+        : 16;
+
   const worlds: GameState[] = [];
-  for (let w = 0; w < WORLD_COUNT; w++) {
+  for (let w = 0; w < worldCount; w++) {
     worlds.push(sampleConsistentWorld(state, belief, rng));
   }
 
@@ -697,33 +528,33 @@ function searchMidgameDeterminized(
       validCount += 1;
 
       let sim = firstStep.state;
-      const startBout = world.boutNumber;
-
-      for (let ply = 0; ply < MAX_PLIES; ply++) {
-        if (sim.phase === 'finished') break;
-        // Simulate through current bout and 1 full subsequent bout for tempo & draw evaluation
-        if (sim.boutNumber >= startBout + 2) break;
+      let plies = 0;
+      // Roll out all the way to game completion (or until Master escapes!)
+      while (sim.phase === 'playing' && plies < 140) {
+        const mPlayer = sim.players[masterIndex];
+        if (mPlayer?.isOut) break; // Master already escaped!
         const actorIdx = getActiveActorIndex(sim);
         if (actorIdx === null) break;
-        const nextAction = pickFastRolloutAction(sim, actorIdx);
+        const nextAction = pickHeuristicActionForPlayer(sim, actorIdx, 'extreme');
         if (!nextAction) break;
         const nextRes = applyGameAction(sim, nextAction);
         if (!nextRes.ok) break;
         sim = nextRes.state;
+        plies += 1;
       }
 
-      totalScore += evaluateMasterPosition(sim, masterId, belief);
+      totalScore += scoreGameOutcome(sim, masterId);
     }
 
     if (validCount === 0) continue;
     let avgScore = totalScore / validCount;
 
-    // Gentle card-counting tie-breaker for defending with rank-safe cards
+    // Subtle card-counting tie-breaker when rollout win rates are close
     if (candidate.type === 'defend') {
       const card = state.players[masterIndex].hand.find((c) => c.id === candidate.cardId);
       if (card) {
         const liveCopies = belief.liveRankCounts.get(card.rank) ?? 0;
-        if (liveCopies === 0) avgScore += 4;
+        if (liveCopies === 0) avgScore += 2.5;
       }
     }
 
@@ -749,6 +580,6 @@ export function pickMasterAction(state: GameState, playerIndex: number): GameAct
     if (solved) return solved;
   }
 
-  // 2. Otherwise run Determinized Monte Carlo Rollout Search!
-  return searchMidgameDeterminized(state, playerIndex, belief);
+  // 2. Otherwise run Full-Game PIMC (Monte Carlo Determinization to Game Over)!
+  return searchFullGamePimc(state, playerIndex, belief);
 }
